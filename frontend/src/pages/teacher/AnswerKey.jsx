@@ -59,8 +59,8 @@ export default function AnswerKey() {
       <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-card p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 font-display">Configure Answer Key</h1>
-            <p className="text-xs text-slate-500">Provide correct answers to trigger automatic marking</p>
+            <h1 className="text-xl font-bold text-slate-900 font-display">Review & Correct Answer Key</h1>
+            <p className="text-xs text-slate-500">Edit or void incorrect correct option mappings and re-evaluate submitted answers</p>
           </div>
           <button onClick={() => navigate('/teacher/exams')} className="btn-secondary py-2 text-xs">
             Back
@@ -106,7 +106,7 @@ export default function AnswerKey() {
             disabled={saving || Object.keys(keys).length < questions.length}
             className="w-full btn-primary py-3 disabled:opacity-50"
           >
-            {saving ? 'Saving and evaluating exam papers...' : 'Save Answer Key & Run Auto-Evaluation'}
+            {saving ? 'Saving and evaluating exam papers...' : 'Save Corrections & Re-evaluate Attempts'}
           </button>
         </div>
       </div>

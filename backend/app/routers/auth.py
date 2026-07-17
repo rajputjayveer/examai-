@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash, verify_password, create_access_token
-from app.core.deps import get_current_active_user
+from app.core.deps import get_current_active_user, RoleChecker
 from app.db.base import get_db
 from app.models.user import User
 from app.models.otp import OTPVerification
@@ -15,12 +15,11 @@ from app.core.config import settings
 router = APIRouter()
 
 def send_otp_email(email: str, otp_code: str):
-    # If in DEV_MODE, print to console
-    if settings.DEV_MODE:
-        print(f"\n--- [DEV MODE] OTP Code for {email}: {otp_code} ---\n")
-    else:
-        # SMTP email logic could be integrated here, but for now we print it
-        print(f"\n--- [SMTP MOCKED] OTP Code for {email}: {otp_code} ---\n")
+    send_email(
+        email,
+        "Verify your ExamGuard AI account",
+        f"Your verification code is: {otp_code}\nExpires in 5 minutes."
+    )
 
 @router.post("/register", response_model=UserResponse)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
@@ -114,13 +113,20 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+import secrets
+import string
+from app.services.email_service import send_email
+
+def generate_temp_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
 @router.post("/admin/create-teacher", response_model=UserResponse)
 def create_teacher(
     user_in: UserCreate,
+    current_user: User = Depends(RoleChecker(["admin"])),
     db: Session = Depends(get_db)
 ):
-    # Verify it is admin based on current flow
-    # We can allow admin to create teacher directly
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
         raise HTTPException(
@@ -128,19 +134,44 @@ def create_teacher(
             detail="User already exists"
         )
         
-    hashed_password = get_password_hash(user_in.password)
+    temp_password = generate_temp_password()
+    hashed_password = get_password_hash(temp_password)
     db_user = User(
         name=user_in.name,
         email=user_in.email,
         password_hash=hashed_password,
         role="teacher",
         is_verified=True,
-        face_enrolled=True # Teachers don't enroll faces
+        face_enrolled=True,
+        must_change_password=True
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    
+    send_email(
+        db_user.email,
+        "Your ExamGuard AI Teacher Account Details",
+        f"Hello {db_user.name},\n\nAn instructor account has been created for you.\n"
+        f"Login Email: {db_user.email}\nTemporary Password: {temp_password}\n\n"
+        f"You will be prompted to change this password on your first login."
+    )
     return db_user
+
+@router.post("/change-password")
+def change_password(
+    old_password: str,
+    new_password: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if not verify_password(old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    current_user.password_hash = get_password_hash(new_password)
+    current_user.must_change_password = False
+    db.commit()
+    return {"detail": "Password updated successfully"}
+
 
 
 @router.get("/me")
@@ -152,4 +183,46 @@ def get_current_user_profile(current_user: User = Depends(get_current_active_use
         "email": current_user.email,
         "role": current_user.role,
         "face_enrolled": getattr(current_user, "face_enrolled", True),
+        "must_change_password": getattr(current_user, "must_change_password", False),
     }
+
+@router.post("/forgot-password")
+def forgot_password(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    # Always return success message to avoid email enumeration
+    if user:
+        otp_code = f"{random.randint(100000, 999999)}"
+        db_otp = OTPVerification(
+            user_id=user.id,
+            otp_hash=get_password_hash(otp_code),
+            expires_at=datetime.utcnow() + timedelta(minutes=10)
+        )
+        db.add(db_otp)
+        db.commit()
+        send_email(
+            user.email,
+            "Reset your ExamGuard AI Password",
+            f"Your password reset verification code is: {otp_code}\nExpires in 10 minutes."
+        )
+    return {"detail": "If that email is registered, a reset code has been sent."}
+
+@router.post("/reset-password")
+def reset_password(email: str, code: str, new_password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid code or email")
+
+    otp_record = db.query(OTPVerification).filter(
+        OTPVerification.user_id == user.id
+    ).order_by(OTPVerification.created_at.desc()).first()
+
+    if not otp_record or datetime.utcnow() > otp_record.expires_at:
+        raise HTTPException(status_code=400, detail="Code expired or invalid")
+    if not verify_password(code, otp_record.otp_hash):
+        raise HTTPException(status_code=400, detail="Invalid code")
+
+    user.password_hash = get_password_hash(new_password)
+    user.must_change_password = False
+    db.commit()
+    return {"detail": "Password reset successfully"}
+

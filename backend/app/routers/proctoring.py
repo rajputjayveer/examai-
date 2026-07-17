@@ -53,16 +53,34 @@ def log_violation(
     db.refresh(violation)
     return violation
 
+from app.services.face_service import compare_descriptors
+
 @router.post("/identity-check")
 def identity_check(
     check_in: IdentityCheckCreate,
     current_user: User = Depends(RoleChecker(["student"])),
     db: Session = Depends(get_db)
 ):
-    attempt = db.query(Attempt).filter(Attempt.id == check_in.attempt_id, Attempt.student_id == current_user.id).first()
+    attempt = db.query(Attempt).filter(
+        Attempt.id == check_in.attempt_id,
+        Attempt.student_id == current_user.id
+    ).first()
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
-        
-    # We will save this temporary check snapshot or process it via face verification service
-    # For now, return verified status
-    return {"verified": True}
+
+    if not current_user.face_descriptor:
+        return {"verified": False, "reason": "no_reference_enrolled"}
+
+    is_match, distance = compare_descriptors(current_user.face_descriptor, check_in.descriptor)
+
+    if not is_match:
+        violation = Violation(
+            attempt_id=attempt.id,
+            type="identity_mismatch",
+            evidence_path=None
+        )
+        db.add(violation)
+        db.commit()
+
+    return {"verified": is_match, "distance": round(distance, 3)}
+

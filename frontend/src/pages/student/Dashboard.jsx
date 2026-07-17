@@ -106,8 +106,21 @@ export default function StudentDashboard() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 rounded-full border-4 border-brand-200 border-t-brand-600 animate-spin" />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {[1, 2, 3].map(n => (
+              <div key={n} className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-4 animate-pulse">
+                <div className="flex justify-between items-start">
+                  <div className="h-4 bg-slate-200 rounded w-2/3" />
+                  <div className="h-5 bg-slate-200 rounded-full w-16" />
+                </div>
+                <div className="space-y-2 mt-2">
+                  <div className="h-3 bg-slate-200 rounded w-1/2" />
+                  <div className="h-3 bg-slate-200 rounded w-3/4" />
+                  <div className="h-3 bg-slate-200 rounded w-2/3" />
+                </div>
+                <div className="h-10 bg-slate-100 rounded-xl w-full mt-4" />
+              </div>
+            ))}
           </div>
         ) : exams.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-card">

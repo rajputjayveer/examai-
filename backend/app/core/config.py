@@ -5,11 +5,10 @@ class Settings(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: str = "3306"
     DB_USER: str = "root"
-    DB_PASSWORD: str = "#rajputjayveer"
+    DB_PASSWORD: str
     DB_NAME: str = "examguard"
-    DATABASE_URL: str = "mysql+pymysql://DB_USER:DB_PASSWORD@localhost:3306/examguard"
-    JWT_SECRET: str = "change-me-to-a-very-secure-secret-key-32-chars-long"
-
+    DATABASE_URL: str = "mysql+pymysql://root:@localhost:3306/examguard"
+    JWT_SECRET: str
     JWT_EXPIRE_MINUTES: int = 60
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
@@ -18,7 +17,8 @@ class Settings(BaseSettings):
     DEV_MODE: bool = True
     GEMINI_API_KEY: str = ""
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "secure-admin-password"
+    ADMIN_PASSWORD: str
+
 
 
 

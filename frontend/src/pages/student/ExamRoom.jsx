@@ -15,10 +15,11 @@ async function loadFaceApi() {
     if (!faceapi) return;
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODEL_URL)
+      faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODEL_URL)
     ]);
     faceApiReady = true;
-    console.log('[ExamGuard] face-api.js tinyFaceDetector + faceLandmark68Net loaded ✓');
+    console.log('[ExamGuard] face-api.js tinyFaceDetector + faceLandmark68Net + faceRecognitionNet loaded ✓');
   } catch (e) {
     console.warn('[ExamGuard] face-api.js failed to load — face detection disabled:', e.message);
   }
@@ -155,26 +156,25 @@ export default function ExamRoom() {
     }
   };
 
-  // ── Send periodic identity-check snapshot to backend ────────────────────────
   const sendIdentityCheck = async () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, 320, 240);
-    const snapshot = canvas.toDataURL('image/jpeg', 0.7);
-
+    if (!faceApiReady || !videoRef.current) return;
     try {
+      const detection = await window.faceapi
+        .detectSingleFace(videoRef.current, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) return;
+
       const res = await client.post('/proctoring/identity-check', {
         attempt_id: parseInt(attemptId),
-        snapshot,
+        descriptor: Array.from(detection.descriptor)
       });
-      if (res.data?.match === false) {
-        triggerViolation('identity_mismatch', '⚠ Face does not match enrolled identity');
+      if (res.data?.verified === false) {
+        triggerViolation('identity_mismatch', '⚠ Identity check failed — face does not match enrollment');
       }
-    } catch {
-      // Non-critical; proceed silently
+    } catch (e) {
+      console.warn('Identity check failed to reach server', e);
     }
   };
 
@@ -391,10 +391,13 @@ export default function ExamRoom() {
         </div>
       </header>
 
-      {/* ── Violation alert banner ── */}
+      {/* ── Fixed top-right violation toast (non-obstructive UI) ── */}
       {violationMsg && (
-        <div className="sticky top-16 z-10 bg-red-600 text-white text-center py-2 px-4 text-sm font-semibold animate-fade-in">
-          {violationMsg}
+        <div className="fixed top-20 right-4 z-50 max-w-sm bg-red-600 text-white shadow-lg rounded-xl py-3 px-4 text-xs font-bold flex items-center gap-2 border border-red-500 animate-slide-up">
+          <svg className="w-4 h-4 text-white flex-shrink-0 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>{violationMsg}</span>
         </div>
       )}
 

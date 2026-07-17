@@ -100,7 +100,7 @@ export default function ExamList() {
                         onClick={() => navigate(`/teacher/exam/${exam.id}/answer-key`)}
                         className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
                       >
-                        {isEvaluated ? 'Edit Key' : 'Answer Key'}
+                        {isEvaluated ? 'Correct Key' : 'Review Key'}
                       </button>
                     )}
                     <button

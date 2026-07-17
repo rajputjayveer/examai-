@@ -33,8 +33,11 @@ export default function ResultsDashboard() {
 
       <main className="max-w-6xl mx-auto px-6 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 rounded-full border-4 border-brand-200 border-t-brand-600 animate-spin" />
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4 animate-pulse">
+            <div className="h-8 bg-slate-100 rounded w-full" />
+            <div className="h-10 bg-slate-50 rounded w-full" />
+            <div className="h-10 bg-slate-50 rounded w-full" />
+            <div className="h-10 bg-slate-50 rounded w-full" />
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
@@ -68,8 +71,14 @@ export default function ResultsDashboard() {
                           {row.score !== null ? `${row.score} pts` : <span className="text-slate-400">Pending</span>}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={row.violations_count > 0 ? 'badge-red font-bold animate-pulse' : 'text-slate-400 text-xs'}>
-                            {row.violations_count}
+                          <span className={
+                            row.violations_count === 0
+                              ? 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-250'
+                              : row.violations_count <= 2
+                                ? 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-250'
+                                : 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-250 animate-pulse font-bold'
+                          }>
+                            {row.violations_count === 0 ? '0 (Safe)' : `${row.violations_count} flag(s)`}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-slate-500">

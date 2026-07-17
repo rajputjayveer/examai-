@@ -7,6 +7,11 @@ import Landing from './pages/Landing';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import VerifyOtp from './pages/auth/VerifyOtp';
+import ChangePassword from './pages/auth/ChangePassword';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+
+
 
 // Student pages
 import StudentDashboard from './pages/student/Dashboard';
@@ -46,11 +51,17 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (!user) return <Navigate to="/" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
 
+  // Force password change on first login
+  if (user.must_change_password && window.location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
+  }
+
   // Force face enrollment for un-enrolled students
   if (
     user.role === 'student' &&
     !user.face_enrolled &&
-    window.location.pathname !== '/enroll-face'
+    window.location.pathname !== '/enroll-face' &&
+    window.location.pathname !== '/change-password'
   ) {
     return <Navigate to="/enroll-face" replace />;
   }
@@ -84,6 +95,9 @@ export default function App() {
           <Route path="/login"      element={<Login />} />
           <Route path="/register"   element={<Register />} />
           <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* ── Admin (has its own internal login screen) ── */}
           <Route path="/admin" element={<AdminPanel />} />

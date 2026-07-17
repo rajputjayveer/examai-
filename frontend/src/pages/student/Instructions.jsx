@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 
+const FACE_API_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
 export default function Instructions() {
   const { examId } = useParams();
   const [exam, setExam] = useState(null);
@@ -23,42 +25,82 @@ export default function Instructions() {
 
   const verifyIdentity = async () => {
     setVerifying(true);
-    setStatusMsg('Starting camera…');
+    setStatusMsg('Initializing biometric engine...');
     try {
-      const ms = await navigator.mediaDevices.getUserMedia({ video: true });
+      const faceapi = window.faceapi;
+      if (!faceapi) {
+        throw new Error("Biometric library not loaded");
+      }
+      
+      // Load models if not loaded yet
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODEL_URL)
+      ]);
+
+      const ms = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
       streamRef.current = ms;
       if (videoRef.current) videoRef.current.srcObject = ms;
-      setStatusMsg('Verifying your identity against enrolled face…');
+      setStatusMsg('Verifying face biometrics. Please look directly at the camera...');
 
-      await new Promise(r => setTimeout(r, 2500));
+      await new Promise(r => setTimeout(r, 2000));
 
-      // Capture frame and send to backend identity-check
       const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (video && canvas) {
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-        const snapshot = canvas.toDataURL('image/jpeg');
-        // Fire-and-forget identity check (for demo the endpoint always returns verified:true)
-        client.post('/proctoring/identity-check', { attempt_id: 0, snapshot }).catch(() => {});
-      }
+      if (video) {
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
 
-      ms.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-      setCameraVerified(true);
-      setVerifying(false);
-      setStatusMsg('Identity verified! You may now enter the exam.');
+        if (!detection) {
+          throw new Error("No face detected. Align your face and try again.");
+        }
+
+        // Start exam attempt to get attempt_id
+        const resStart = await client.post(`/attempts/start?exam_id=${examId}`);
+        const attemptId = resStart.data.id;
+
+        // Verify descriptor against reference
+        const checkRes = await client.post('/proctoring/identity-check', {
+          attempt_id: attemptId,
+          descriptor: Array.from(detection.descriptor)
+        });
+
+        if (checkRes.data?.verified) {
+          ms.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+          setCameraVerified(true);
+          setVerifying(false);
+          setStatusMsg('Biometric verification passed! Access granted.');
+          // Store attempt ID to skip start endpoint request in handleStart
+          sessionStorage.setItem(`exam_attempt_${examId}`, attemptId);
+        } else {
+          throw new Error("Biometrics mismatch. Face does not match registered profile.");
+        }
+      }
     } catch (err) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
       setVerifying(false);
-      setStatusMsg('Camera access denied. Please allow camera permissions and try again.');
+      setStatusMsg(err.message || 'Verification failed. Try again.');
     }
   };
 
   const handleStart = async () => {
-    try {
-      const res = await client.post(`/attempts/start?exam_id=${examId}`);
-      navigate(`/student/exam/${res.data.id}`);
-    } catch {
-      setStatusMsg('Failed to start exam. Please try again.');
+    const cachedAttemptId = sessionStorage.getItem(`exam_attempt_${examId}`);
+    if (cachedAttemptId) {
+      sessionStorage.removeItem(`exam_attempt_${examId}`);
+      navigate(`/student/exam/${cachedAttemptId}`);
+    } else {
+      try {
+        const res = await client.post(`/attempts/start?exam_id=${examId}`);
+        navigate(`/student/exam/${res.data.id}`);
+      } catch {
+        setStatusMsg('Failed to join exam. Already submitted or closed.');
+      }
     }
   };
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.sql import func
 from app.db.base import Base
 
@@ -12,4 +12,7 @@ class User(Base):
     role = Column(String(50), nullable=False) # "student" or "teacher"
     is_verified = Column(Boolean, default=False)
     face_enrolled = Column(Boolean, default=False)
+    face_descriptor = Column(Text, nullable=True) # JSON array of 128 floats
+    must_change_password = Column(Boolean, default=False) # used for admin temp password
     created_at = Column(DateTime, server_default=func.now())
+

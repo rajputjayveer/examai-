@@ -13,6 +13,7 @@ from app.models.violation import Violation
 from app.models.question import Question
 from app.models.answer import Answer
 from app.services.pdf_service import generate_pdf_report
+from app.core.config import settings
 
 router = APIRouter()
 
