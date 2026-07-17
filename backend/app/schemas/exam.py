@@ -34,6 +34,7 @@ class ExamResponse(ExamBase):
     teacher_id: int
     status: str
     created_at: datetime
+    user_has_submitted: Optional[bool] = False
 
     class Config:
         from_attributes = True

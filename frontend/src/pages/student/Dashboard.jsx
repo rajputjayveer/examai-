@@ -122,7 +122,12 @@ export default function StudentDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-slide-up">
             {exams.map(exam => {
-              const { label, cls } = statusBadge(exam);
+              let { label, cls } = statusBadge(exam);
+              const alreadySubmitted = exam.user_has_submitted;
+              if (alreadySubmitted) {
+                label = 'Submitted';
+                cls = 'badge-green';
+              }
               const isLive = label === 'Live';
               return (
                 <div key={exam.id} className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-4 hover:shadow-card-hover transition-shadow duration-200">
@@ -137,14 +142,14 @@ export default function StudentDashboard() {
                   </div>
                   <button
                     onClick={() => navigate(`/student/instructions/${exam.id}`)}
-                    disabled={!isLive}
+                    disabled={!isLive || alreadySubmitted}
                     className={`mt-auto w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      isLive
+                      isLive && !alreadySubmitted
                         ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     }`}
                   >
-                    {isLive ? '🚀 Join Exam' : label === 'Upcoming' ? '⏳ Not Started Yet' : '✓ Exam Ended'}
+                    {alreadySubmitted ? '✓ Submitted' : isLive ? '🚀 Join Exam' : label === 'Upcoming' ? '⏳ Not Started Yet' : '✓ Exam Ended'}
                   </button>
                 </div>
               );

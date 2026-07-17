@@ -2,8 +2,14 @@ import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:///./examguard.db"
+    DB_HOST: str = "localhost"
+    DB_PORT: str = "3306"
+    DB_USER: str = "root"
+    DB_PASSWORD: str = "#rajputjayveer"
+    DB_NAME: str = "examguard"
+    DATABASE_URL: str = "mysql+pymysql://DB_USER:DB_PASSWORD@localhost:3306/examguard"
     JWT_SECRET: str = "change-me-to-a-very-secure-secret-key-32-chars-long"
+
     JWT_EXPIRE_MINUTES: int = 60
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

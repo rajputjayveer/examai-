@@ -13,9 +13,12 @@ async function loadFaceApi() {
   try {
     const faceapi = window.faceapi;
     if (!faceapi) return;
-    await faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODEL_URL);
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODEL_URL)
+    ]);
     faceApiReady = true;
-    console.log('[ExamGuard] face-api.js models loaded ✓');
+    console.log('[ExamGuard] face-api.js tinyFaceDetector + faceLandmark68Net loaded ✓');
   } catch (e) {
     console.warn('[ExamGuard] face-api.js failed to load — face detection disabled:', e.message);
   }
@@ -113,7 +116,8 @@ export default function ExamRoom() {
       const detections = await window.faceapi.detectAllFaces(
         video,
         new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
-      );
+      ).withFaceLandmarks();
+
       const count = detections.length;
       setFaceCount(count);
 
@@ -121,9 +125,33 @@ export default function ExamRoom() {
         triggerViolation('no_face', '⚠ No face detected — please stay visible');
       } else if (count > 1) {
         triggerViolation('multiple_faces', `⚠ ${count} faces detected — only you should be present`);
+      } else {
+        // Gaze/Head turning detection using landmark offsets (yaw approximation)
+        const landmarks = detections[0].landmarks;
+        const leftEye = landmarks.getLeftEye()[0];
+        const rightEye = landmarks.getRightEye()[3];
+        const nose = landmarks.getNose()[6]; // tip of nose
+
+        if (leftEye && rightEye && nose) {
+          const distToLeft = nose.x - leftEye.x;
+          const distToRight = rightEye.x - nose.x;
+          const ratio = distToLeft / (distToRight || 1);
+
+          // If ratio is off-balance, candidate has turned their head away from center
+          if (ratio < 0.4 || ratio > 2.5) {
+            triggerViolation('look_away', '⚠ Warning: Looking away from the screen detected.');
+          }
+        }
       }
-    } catch {
-      // Silent fail — network/model error, don't disrupt the exam
+    } catch (e) {
+      // Fallback tiny detector only in case landmarks fails
+      try {
+        const simpleDetect = await window.faceapi.detectAllFaces(
+          video,
+          new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+        );
+        setFaceCount(simpleDetect.length);
+      } catch {}
     }
   };
 
@@ -158,30 +186,81 @@ export default function ExamRoom() {
     setTimeout(() => setViolationFlash(false), 2500);
 
     try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      let snapshot = "";
+      if (video && canvas) {
+        canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+        snapshot = canvas.toDataURL('image/jpeg', 0.6);
+      }
+
       await client.post('/proctoring/violation', {
         attempt_id: parseInt(attemptId),
-        violation_type: type,
-        description: msg,
+        type: type,
+        snapshot: snapshot
       });
     } catch { /* silent */ }
   }, [attemptId]);
 
-  // ── Tab-switch guard ─────────────────────────────────────────────────────────
+  // ── Tab-switch, Copy-Paste, and Fullscreen Guards ───────────────────────────
   useEffect(() => {
+    // Force fullscreen
+    const requestFs = () => {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    };
+
+    requestFs();
+
     const onVisibilityChange = () => {
       if (document.hidden) {
         triggerViolation('tab_switch', '⚠ Tab switched — stay on the exam page');
       }
     };
+
     const onBlur = () => {
       triggerViolation('window_blur', '⚠ Window lost focus — keep exam in foreground');
     };
 
+    const onCopy = (e) => {
+      e.preventDefault();
+      triggerViolation('copy_paste', '⚠ Copying text is blocked during the exam!');
+    };
+
+    const onContextMenu = (e) => {
+      e.preventDefault();
+      triggerViolation('right_click', '⚠ Right-click options are disabled!');
+    };
+
+    const onKeyDown = (e) => {
+      // Block Ctrl+C, Ctrl+V, Cmd+C, Cmd+V
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v' || e.key === 'i' || e.key === 'u')) {
+        e.preventDefault();
+        triggerViolation('copy_paste', '⚠ Copy-paste combinations are disabled!');
+      }
+    };
+
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        triggerViolation('fullscreen_exit', '⚠ Fullscreen mode exited! Stay in fullscreen to avoid flag.');
+      }
+    };
+
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('blur', onBlur);
+    document.addEventListener('copy', onCopy);
+    document.addEventListener('contextmenu', onContextMenu);
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', onBlur);
+      document.removeEventListener('copy', onCopy);
+      document.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
     };
   }, [triggerViolation]);
 

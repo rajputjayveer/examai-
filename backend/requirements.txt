@@ -10,6 +10,8 @@ reportlab
 deepface
 opencv-python-headless
 python-dotenv
+pymysql
+pymupdf
 fastapi-mail
 google-generativeai
 

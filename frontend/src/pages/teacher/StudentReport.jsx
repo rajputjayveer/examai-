@@ -17,9 +17,21 @@ export default function StudentReport() {
       .catch(() => setLoading(false));
   }, [attemptId]);
 
-  const downloadPdf = () => {
-    window.open(`/api/reports/${attemptId}/pdf`, '_blank');
+  const downloadPdf = async () => {
+    try {
+      const response = await client.get(`/reports/${attemptId}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ExamGuard_Report_${attemptId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      alert('Failed to download PDF report.');
+    }
   };
+
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -107,6 +119,16 @@ export default function StudentReport() {
                 </div>
               </div>
             </div>
+
+            {/* Gemini AI Auditor Insights */}
+            {report.ai_insight && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6">
+                <h3 className="text-base font-bold text-slate-950 mb-3 font-display">✨ AI Proctor Audit</h3>
+                <div className="bg-red-50/40 border border-red-100 rounded-xl p-4">
+                  <p className="text-xs text-slate-700 leading-relaxed font-medium">{report.ai_insight}</p>
+                </div>
+              </div>
+            )}
 
             {/* Violation Feed */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6">

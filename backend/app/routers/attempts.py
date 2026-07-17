@@ -26,11 +26,12 @@ def start_attempt(
     # Check if ongoing attempt exists
     existing_attempt = db.query(Attempt).filter(
         Attempt.exam_id == exam_id,
-        Attempt.student_id == current_user.id,
-        Attempt.status == "ongoing"
+        Attempt.student_id == current_user.id
     ).first()
     
     if existing_attempt:
+        if existing_attempt.status in ["submitted", "graded"]:
+            raise HTTPException(status_code=400, detail="You have already submitted this exam.")
         return existing_attempt
         
     attempt = Attempt(
@@ -104,3 +105,47 @@ def submit_attempt(
     db.commit()
     db.refresh(attempt)
     return attempt
+
+
+from app.schemas.exam import QuestionResponse
+
+@router.get("/{attempt_id}/questions")
+def get_attempt_questions(
+    attempt_id: int,
+    current_user: User = Depends(RoleChecker(["student"])),
+    db: Session = Depends(get_db)
+):
+    """Fetch the exam attempt and related questions to render inside the Exam Room."""
+    attempt = db.query(Attempt).filter(Attempt.id == attempt_id, Attempt.student_id == current_user.id).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+        
+    exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+        
+    questions = db.query(Question).filter(Question.exam_id == exam.id).order_by(Question.order_index).all()
+    
+    return {
+        "attempt": {
+            "id": attempt.id,
+            "exam_id": attempt.exam_id,
+            "student_id": attempt.student_id,
+            "started_at": attempt.started_at,
+            "end_at": exam.end_at, # Ends when exam closes
+            "status": attempt.status
+        },
+        "questions": [
+            {
+                "id": q.id,
+                "exam_id": q.exam_id,
+                "text": q.text,
+                "option_a": q.option_a,
+                "option_b": q.option_b,
+                "option_c": q.option_c,
+                "option_d": q.option_d,
+                "order_index": q.order_index
+            } for q in questions
+        ]
+    }
+

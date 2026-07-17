@@ -57,7 +57,7 @@ def parse_pdf_questions(pdf_file_path: str) -> list:
     """
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(
             [uploaded_file, prompt],
             generation_config={

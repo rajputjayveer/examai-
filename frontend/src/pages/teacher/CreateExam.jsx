@@ -56,8 +56,8 @@ export default function CreateExam() {
       const examRes = await client.post('/exams', {
         title,
         duration_minutes: parseInt(duration),
-        start_at: new Date(startAt).toISOString(),
-        end_at: new Date(endAt).toISOString()
+        start_at: startAt, // sends local datetime string directly
+        end_at: endAt      // sends local datetime string directly
       });
       await client.post(`/exams/${examRes.data.id}/questions`, questions);
       navigate('/teacher/exams');

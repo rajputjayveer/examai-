@@ -100,6 +100,14 @@ export default function Result() {
               </div>
             </div>
 
+            {/* AI Insights Study Tips Card */}
+            {report.ai_insight && (
+              <div className="mb-6 bg-brand-50 border border-brand-200 rounded-xl p-4 text-left">
+                <h4 className="text-xs font-bold text-brand-800 uppercase tracking-wider mb-1.5">✨ AI Mentor Study Insights</h4>
+                <p className="text-xs text-slate-650 leading-relaxed font-medium">{report.ai_insight}</p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3">
               <button
@@ -109,7 +117,20 @@ export default function Result() {
                 Dashboard
               </button>
               <button
-                onClick={() => window.open(`/api/reports/${attemptId}/pdf`, '_blank')}
+                onClick={async () => {
+                  try {
+                    const response = await client.get(`/reports/${attemptId}/pdf`, { responseType: 'blob' });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `ExamGuard_Report_${attemptId}.pdf`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                  } catch {
+                    alert('Failed to download PDF report.');
+                  }
+                }}
                 className="flex-1 btn-primary py-3"
               >
                 Download PDF

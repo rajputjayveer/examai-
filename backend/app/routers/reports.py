@@ -57,6 +57,49 @@ def get_attempt_report(
     student = db.query(User).filter(User.id == attempt.student_id).first()
     exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
     
+    # ── Gemini AI Report Insight Generation ───────────────────────────────────
+    ai_insight = "Gemini AI analysis is loading..."
+    if settings.GEMINI_API_KEY:
+        import google.generativeai as genai
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            
+            # Count details
+            wrong_count = len(questions) - (attempt.score or 0)
+            viol_list = [v.type for v in violations]
+            
+            if current_user.role == "student":
+                prompt = (
+                    f"You are an academic mentor. A student named {student.name if student else 'Student'} "
+                    f"has completed the exam '{exam.title if exam else 'Exam'}' scoring {attempt.score or 0} "
+                    f"out of {len(questions)} (meaning {wrong_count} incorrect answers). They also had "
+                    f"{len(violations)} proctoring warnings logged (warnings: {', '.join(viol_list)}). "
+                    f"Provide a friendly, motivating 3-sentence summary highlighting what they got wrong, "
+                    f"advice on their study gaps, and a polite reminder to maintain focus to avoid warnings."
+                )
+            else:
+                prompt = (
+                    f"You are an AI proctoring auditor. A candidate named {student.name if student else 'Candidate'} "
+                    f"attempted the exam '{exam.title if exam else 'Exam'}'. They logged {len(violations)} "
+                    f"violations (types: {', '.join(viol_list)}). Analyze this sequence of behaviors. "
+                    f"Provide a professional, objective 3-sentence evaluation for the instructor classifying "
+                    f"the cheating risk level (Low, Medium, High) and detailing if these violations "
+                    f"look like tab switches, looking away, or mismatch incidents."
+                )
+                
+            response = model.generate_content(prompt)
+            ai_insight = response.text.strip()
+        except Exception as ai_err:
+            ai_insight = f"Could not generate live AI insights: {str(ai_err)}"
+    else:
+        # Default mock advice if API key is not present
+        if current_user.role == "student":
+            ai_insight = "AI Tip: Try reviewing the incorrect topics. Ensure you keep your eyes focused on the screen to avoid face-tracking warnings next time."
+        else:
+            ai_insight = f"Proctor Audit: Candidate logged {len(violations)} warnings. cheater risk assessment level is low. Monitor tab visibility logs."
+
     return {
         "attempt": {
             "id": attempt.id,
@@ -75,8 +118,12 @@ def get_attempt_report(
                 "created_at": v.created_at
             } for v in violations
         ],
-        "answers": detailed_answers
+        "answers": detailed_answers,
+        "total_questions": len(questions),
+        "ai_insight": ai_insight
     }
+
+
 
 @router.get("/{attempt_id}/pdf")
 def download_pdf_report(
@@ -93,7 +140,8 @@ def download_pdf_report(
         
     student = db.query(User).filter(User.id == attempt.student_id).first()
     exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
-    violations_count = db.query(Violation).filter(Violation.attempt_id == attempt_id).count()
+    violations = db.query(Violation).filter(Violation.attempt_id == attempt_id).all()
+    total_questions = db.query(Question).filter(Question.exam_id == attempt.exam_id).count()
     
     pdf_dir = os.path.join(STORAGE_DIR, "reports")
     os.makedirs(pdf_dir, exist_ok=True)
@@ -103,8 +151,9 @@ def download_pdf_report(
         pdf_path=pdf_path,
         candidate_name=student.name if student else "Unknown",
         exam_title=exam.title if exam else "Unknown",
-        score=attempt.score or 0.0,
-        violations_count=violations_count,
+        score=attempt.score if attempt.score is not None else 0.0,
+        total_questions=total_questions,
+        violations=violations,
         started_at=attempt.started_at,
         submitted_at=attempt.submitted_at
     )

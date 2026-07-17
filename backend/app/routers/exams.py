@@ -23,7 +23,28 @@ def list_exams(
     if current_user.role == "teacher":
         return db.query(Exam).filter(Exam.teacher_id == current_user.id).all()
     else:
-        return db.query(Exam).filter(Exam.status == "published").all()
+        # Load published exams
+        exams = db.query(Exam).filter(Exam.status == "published").all()
+        # Find attempts for this user
+        user_attempts = db.query(Attempt).filter(Attempt.student_id == current_user.id).all()
+        attempt_map = {att.exam_id: att.status for att in user_attempts}
+        
+        response_data = []
+        for e in exams:
+            status_val = attempt_map.get(e.id)
+            has_submitted = status_val in ["submitted", "graded"]
+            response_data.append({
+                "id": e.id,
+                "teacher_id": e.teacher_id,
+                "title": e.title,
+                "duration_minutes": e.duration_minutes,
+                "start_at": e.start_at,
+                "end_at": e.end_at,
+                "status": e.status,
+                "created_at": e.created_at,
+                "user_has_submitted": has_submitted
+            })
+        return response_data
 
 @router.post("", response_model=ExamResponse)
 def create_exam(
