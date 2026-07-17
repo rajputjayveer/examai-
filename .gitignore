@@ -1,0 +1,11 @@
+backend/storage/
+backend/.env
+backend/*.db
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+venv/
+.env
+db.sqlite3
+examguard.db

@@ -1,0 +1,370 @@
+[2026-06-03 19:11:19] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260603_191119.jpg
+Severity: HIGH
+Status: Logged
+
+[2026-06-04 13:43:33] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260604_134333.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 18:20:59] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260604_182059.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 18:56:58] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260604_185658.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 18:58:15] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_185815.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 19:09:58] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_190958.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 19:59:47] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_195947.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 20:39:55] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_203955.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 20:46:27] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_204627.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 21:40:56] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260604_214056.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 21:42:18] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_214218.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 22:50:28] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260604_225028.png
+Severity: High
+Status: Logged
+
+[2026-06-04 22:50:40] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260604_225040.png
+Severity: High
+Status: Logged
+
+[2026-06-04 22:50:58] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260604_225057.png
+Severity: High
+Status: Logged
+
+[2026-06-04 23:10:45] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260604_231045.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 23:11:03] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260604_231103.jpg
+Severity: High
+Status: Logged
+
+[2026-06-04 23:14:44] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260604_231443.png
+Severity: High
+Status: Logged
+
+[2026-06-08 19:29:00] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_192859.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:18:28] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_201827.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:18:37] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_201837.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:18:51] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260608_201851.jpg
+Severity: High
+Status: Logged
+
+[2026-06-08 20:19:14] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260608_201914.jpg
+Severity: High
+Status: Logged
+
+[2026-06-08 20:19:56] VIOLATION: Multiple Faces Detected
+File: backend/evidence/multiple_faces/multiple_faces_20260608_201956.jpg
+Severity: High
+Status: Logged
+
+[2026-06-08 20:20:06] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202006.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:20:21] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202020.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:21:11] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202110.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:22:13] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202212.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:22:20] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202220.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:23:31] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202330.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:23:51] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202351.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:24:06] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202405.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:24:16] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202415.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:26:22] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202621.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:27:41] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202740.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:28:02] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202801.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:28:27] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202826.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:28:57] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202856.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:29:08] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_202908.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:53:41] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_205340.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:54:30] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_205429.png
+Severity: High
+Status: Logged
+
+[2026-06-08 20:54:52] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260608_205452.jpg
+Severity: High
+Status: Logged
+
+[2026-06-08 20:55:06] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260608_205506.png
+Severity: High
+Status: Logged
+
+[2026-06-09 17:48:47] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_174846.png
+Severity: High
+Status: Logged
+
+[2026-06-09 17:50:48] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_175045.png
+Severity: High
+Status: Logged
+
+[2026-06-09 17:51:10] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_175109.png
+Severity: High
+Status: Logged
+
+[2026-06-09 17:59:28] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_175928.png
+Severity: High
+Status: Logged
+
+[2026-06-09 17:59:59] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_175958.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:00:12] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180011.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:01:05] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180104.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:01:13] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180112.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:01:20] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180119.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:04:53] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180453.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:05:07] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180506.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:06:06] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180605.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:08:34] VIOLATION: No Face Detected
+File: backend/evidence/no_face/no_face_20260609_180834.jpg
+Severity: High
+Status: Logged
+
+[2026-06-09 18:08:46] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180846.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:09:26] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_180926.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:18:16] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_181816.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:18:21] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_181821.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:18:27] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_181827.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:18:34] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_181833.png
+Severity: High
+Status: Logged
+
+[2026-06-09 18:40:05] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_184004.png
+Severity: High
+Status: Logged
+
+[2026-06-09 19:21:34] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_192133.png
+Severity: High
+Status: Logged
+
+[2026-06-09 19:21:45] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_192144.png
+Severity: High
+Status: Logged
+
+[2026-06-09 19:21:53] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_192152.png
+Severity: High
+Status: Logged
+
+[2026-06-09 19:23:01] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_192301.png
+Severity: High
+Status: Logged
+
+[2026-06-09 19:23:09] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_192308.png
+Severity: High
+Status: Logged
+
+[2026-06-09 19:30:26] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260609_193025.png
+Severity: High
+Status: Logged
+
+[2026-07-17 12:31:56] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260717_123155.png
+Severity: High
+Status: Logged
+
+[2026-07-17 12:32:15] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260717_123215.png
+Severity: High
+Status: Logged
+
+[2026-07-17 12:32:52] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260717_123251.png
+Severity: High
+Status: Logged
+
+[2026-07-17 12:32:59] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260717_123259.png
+Severity: High
+Status: Logged
+
+[2026-07-17 12:33:16] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260717_123315.png
+Severity: High
+Status: Logged
+
+[2026-07-17 12:33:35] VIOLATION: Tab Switch Detected
+File: backend/evidence/tab_switch/tab_switch_20260717_123335.png
+Severity: High
+Status: Logged
+

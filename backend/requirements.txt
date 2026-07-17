@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pymysql
+reportlab
+deepface
+opencv-python-headless
+python-dotenv
+fastapi-mail
+google-generativeai
+
+
