@@ -47,24 +47,23 @@ export default function Instructions() {
       await new Promise(r => setTimeout(r, 2000));
 
       const video = videoRef.current;
-      if (video) {
-        const detection = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
-        if (!detection) {
-          throw new Error("No face detected. Align your face and try again.");
-        }
-
+      const canvas = canvasRef.current;
+      if (video && canvas) {
         // Start exam attempt to get attempt_id
         const resStart = await client.post(`/attempts/start?exam_id=${examId}`);
         const attemptId = resStart.data.id;
 
-        // Verify descriptor against reference
+        // Draw and capture snapshot
+        const ctx = canvas.getContext('2d');
+        canvas.width = 320;
+        canvas.height = 240;
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const snapshot = canvas.toDataURL('image/jpeg', 0.8);
+
+        // Verify snapshot against reference image
         const checkRes = await client.post('/proctoring/identity-check', {
           attempt_id: attemptId,
-          descriptor: Array.from(detection.descriptor)
+          snapshot: snapshot
         });
 
         if (checkRes.data?.verified) {

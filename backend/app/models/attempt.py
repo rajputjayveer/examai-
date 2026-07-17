@@ -14,6 +14,9 @@ class Attempt(Base):
     score = Column(Float, nullable=True)
     status = Column(String(50), default="ongoing") # "ongoing", "submitted", "graded"
 
+    student_insight = Column(String, nullable=True)
+    teacher_insight = Column(String, nullable=True)
+
     exam = relationship("Exam", back_populates="attempts")
     answers = relationship("Answer", back_populates="attempt", cascade="all, delete-orphan")
     violations = relationship("Violation", back_populates="attempt", cascade="all, delete-orphan")

@@ -18,5 +18,6 @@ class ViolationResponse(BaseModel):
 
 class IdentityCheckCreate(BaseModel):
     attempt_id: int
-    descriptor: list[float]
+    snapshot: str # Base64 encoded JPEG image
+
 

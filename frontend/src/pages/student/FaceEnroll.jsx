@@ -114,16 +114,22 @@ export default function FaceEnroll() {
   }, [stream, modelsReady]);
 
   const handleEnroll = async () => {
-    if (!descriptor) {
-      setStatusMsg('Please wait until face quality check passes (green text).');
-      return;
-    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
 
     setLoading(true);
     setStatusMsg('Enrolling face reference...');
     try {
+      // Capture live image frame from video feed
+      const ctx = canvas.getContext('2d');
+      canvas.width = 640;
+      canvas.height = 480;
+      ctx.drawImage(video, 0, 0, 640, 480);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
       await client.post('/students/enroll-face', {
-        descriptor: descriptor
+        image: dataUrl
       });
       setStatusMsg('Face reference enrolled successfully! Redirecting...');
       stream?.getTracks().forEach(t => t.stop());

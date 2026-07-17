@@ -68,9 +68,9 @@ export default function StudentDashboard() {
       .catch(() => setLoading(false));
   }, []);
 
-  const liveExams     = exams.filter(e => { const now = new Date(); return now >= new Date(e.start_at) && now <= new Date(e.end_at); });
-  const upcomingExams = exams.filter(e => new Date() < new Date(e.start_at));
-  const pastExams     = exams.filter(e => new Date() > new Date(e.end_at));
+  const liveExams     = exams.filter(e => { const now = new Date(); return now >= new Date(e.start_at) && now <= new Date(e.end_at) && !e.user_has_submitted; });
+  const upcomingExams = exams.filter(e => new Date() < new Date(e.start_at) && !e.user_has_submitted);
+  const completedExams = exams.filter(e => e.user_has_submitted || new Date() > new Date(e.end_at));
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -89,7 +89,7 @@ export default function StudentDashboard() {
           {[
             { label: 'Live Now',  value: liveExams.length,     color: 'text-emerald-600', bg: 'bg-emerald-50', icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z' },
             { label: 'Upcoming',  value: upcomingExams.length, color: 'text-blue-600',    bg: 'bg-blue-50',    icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5' },
-            { label: 'Completed', value: pastExams.length,     color: 'text-slate-600',  bg: 'bg-slate-100',  icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+            { label: 'Completed', value: completedExams.length, color: 'text-slate-600',  bg: 'bg-slate-100',  icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
           ].map(s => (
             <div key={s.label} className={`bg-white rounded-2xl border border-slate-200 p-5 shadow-card flex items-center gap-4`}>
               <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
@@ -133,40 +133,84 @@ export default function StudentDashboard() {
             <p className="text-sm text-slate-400">Your teacher hasn't published any exams yet. Check back soon.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-slide-up">
-            {exams.map(exam => {
-              let { label, cls } = statusBadge(exam);
-              const alreadySubmitted = exam.user_has_submitted;
-              if (alreadySubmitted) {
-                label = 'Submitted';
-                cls = 'badge-green';
-              }
-              const isLive = label === 'Live';
-              return (
-                <div key={exam.id} className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-4 hover:shadow-card-hover transition-shadow duration-200">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-slate-900 font-display leading-snug">{exam.title}</h3>
-                    <span className={cls}>{label}</span>
-                  </div>
-                  <div className="text-xs text-slate-500 space-y-1">
-                    <p>⏱ Duration: <span className="font-medium text-slate-700">{exam.duration_minutes} mins</span></p>
-                    <p>📅 Starts: {new Date(exam.start_at).toLocaleString()}</p>
-                    <p>🏁 Ends: {new Date(exam.end_at).toLocaleString()}</p>
-                  </div>
-                  <button
-                    onClick={() => navigate(`/student/instructions/${exam.id}`)}
-                    disabled={!isLive || alreadySubmitted}
-                    className={`mt-auto w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      isLive && !alreadySubmitted
-                        ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm'
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {alreadySubmitted ? '✓ Submitted' : isLive ? '🚀 Join Exam' : label === 'Upcoming' ? '⏳ Not Started Yet' : '✓ Exam Ended'}
-                  </button>
+          <div className="space-y-8">
+            {/* Active / Upcoming Exams list */}
+            <div>
+              <h2 className="text-base font-bold text-slate-900 mb-4 font-display">Available Tests</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-slide-up">
+                {exams.filter(e => !e.user_has_submitted).map(exam => {
+                  const { label, cls } = statusBadge(exam);
+                  const isLive = label === 'Live';
+                  return (
+                    <div key={exam.id} className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-4 hover:shadow-card-hover transition-shadow duration-200">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-slate-900 font-display leading-snug">{exam.title}</h3>
+                        <span className={cls}>{label}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 space-y-1">
+                        <p>⏱ Duration: <span className="font-medium text-slate-700">{exam.duration_minutes} mins</span></p>
+                        <p>📅 Starts: {new Date(exam.start_at).toLocaleString()}</p>
+                        <p>🏁 Ends: {new Date(exam.end_at).toLocaleString()}</p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/student/instructions/${exam.id}`)}
+                        disabled={!isLive}
+                        className={`mt-auto w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                          isLive
+                            ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {isLive ? '🚀 Join Exam' : '⏳ Not Started Yet'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Completed Exams History list */}
+            {completedExams.length > 0 && (
+              <div>
+                <h2 className="text-base font-bold text-slate-900 mb-4 font-display">Completed & Past Exams History</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-slide-up">
+                  {completedExams.map(exam => {
+                    return (
+                      <div key={exam.id} className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-4 opacity-90">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-semibold text-slate-950 font-display leading-snug">{exam.title}</h3>
+                          <span className="badge-green">Completed</span>
+                        </div>
+                        <div className="text-xs text-slate-500 space-y-1">
+                          <p>⏱ Duration: <span className="font-medium text-slate-700">{exam.duration_minutes} mins</span></p>
+                          <p className="font-semibold text-slate-700">
+                            🎯 Score: <span className="text-brand-600 text-sm font-bold">{exam.user_score !== null && exam.user_score !== undefined ? exam.user_score : '0'}</span> / {exam.total_marks || 0} marks
+                          </p>
+                        </div>
+                        {exam.user_attempt_id && (
+                          <div className="flex gap-2 mt-auto">
+                            <button
+                              onClick={() => navigate(`/student/result/${exam.user_attempt_id}`)}
+                              className="flex-1 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition"
+                            >
+                              📊 View Insights
+                            </button>
+                            <a
+                              href={`${client.defaults.baseURL}/reports/attempts/${exam.user_attempt_id}/pdf`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 py-2 rounded-xl text-xs font-semibold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-center transition flex items-center justify-center gap-1"
+                            >
+                              📥 PDF Report
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
       </main>

@@ -12,10 +12,12 @@ router = APIRouter()
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage")
 
 from pydantic import BaseModel
-from app.services.face_service import save_descriptor
+
+
+import base64
 
 class FaceEnrollRequest(BaseModel):
-    descriptor: list[float]
+    image: str # Base64 image snapshot
 
 @router.post("/enroll-face")
 def enroll_face(
@@ -23,10 +25,22 @@ def enroll_face(
     current_user: User = Depends(RoleChecker(["student"])),
     db: Session = Depends(get_db)
 ):
-    if len(payload.descriptor) != 128:
-        raise HTTPException(status_code=400, detail="Invalid face descriptor")
+    if not payload.image:
+        raise HTTPException(status_code=400, detail="Image data is required")
 
-    current_user.face_descriptor = save_descriptor(payload.descriptor)
+    user_dir = os.path.join(STORAGE_DIR, "faces", str(current_user.id))
+    os.makedirs(user_dir, exist_ok=True)
+    file_path = os.path.join(user_dir, "reference.jpg")
+
+    try:
+        header, encoded = payload.image.split(",", 1) if "," in payload.image else ("", payload.image)
+        img_data = base64.b64decode(encoded)
+        with open(file_path, "wb") as f:
+            f.write(img_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
+
+    current_user.face_descriptor = f"faces/{current_user.id}/reference.jpg" # store image path
     current_user.face_enrolled = True
     db.commit()
     return {"detail": "Face reference enrolled successfully"}

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import client from '../../api/client';
 
 export default function AdminPanel() {
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('adminToken'));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState('teachers');
@@ -16,10 +16,10 @@ export default function AdminPanel() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
+  const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
   const fetchData = async () => {
-    const token = localStorage.getItem('adminToken');
+    const token = localStorage.getItem('token');
     if (!token) return;
     setLoading(true);
     try {
@@ -49,7 +49,7 @@ export default function AdminPanel() {
       const res = await client.post('/auth/login', params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
-      localStorage.setItem('adminToken', res.data.access_token);
+      localStorage.setItem('token', res.data.access_token);
       setIsLoggedIn(true);
     } catch {
       setError('Invalid admin credentials. Check username and password.');
@@ -86,9 +86,7 @@ export default function AdminPanel() {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
-    localStorage.removeItem('token');
     setIsLoggedIn(false);
-    window.location.href = '/';
   };
 
   const tabs = [

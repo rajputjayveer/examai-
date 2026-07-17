@@ -116,7 +116,7 @@ export default function ExamRoom() {
     try {
       const detections = await window.faceapi.detectAllFaces(
         video,
-        new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+        new window.faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 })
       ).withFaceLandmarks();
 
       const count = detections.length;
@@ -157,18 +157,18 @@ export default function ExamRoom() {
   };
 
   const sendIdentityCheck = async () => {
-    if (!faceApiReady || !videoRef.current) return;
-    try {
-      const detection = await window.faceapi
-        .detectSingleFace(videoRef.current, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
 
-      if (!detection) return;
+    try {
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, 320, 240);
+      const snapshot = canvas.toDataURL('image/jpeg', 0.7);
 
       const res = await client.post('/proctoring/identity-check', {
         attempt_id: parseInt(attemptId),
-        descriptor: Array.from(detection.descriptor)
+        snapshot: snapshot
       });
       if (res.data?.verified === false) {
         triggerViolation('identity_mismatch', '⚠ Identity check failed — face does not match enrollment');

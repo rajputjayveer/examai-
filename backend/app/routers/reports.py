@@ -58,20 +58,22 @@ def get_attempt_report(
     student = db.query(User).filter(User.id == attempt.student_id).first()
     exam = db.query(Exam).filter(Exam.id == attempt.exam_id).first()
     
-    # ── Gemini AI Report Insight Generation ───────────────────────────────────
-    ai_insight = "Gemini AI analysis is loading..."
-    if settings.GEMINI_API_KEY:
+    # ── Gemini AI Report Insight Generation with Database Caching ─────────────
+    is_student = (current_user.role == "student")
+    cached_insight = attempt.student_insight if is_student else attempt.teacher_insight
+
+    if cached_insight:
+        ai_insight = cached_insight
+    elif settings.GEMINI_API_KEY:
         import google.generativeai as genai
         genai.configure(api_key=settings.GEMINI_API_KEY)
         
         try:
             model = genai.GenerativeModel("gemini-2.5-flash")
-            
-            # Count details
             wrong_count = len(questions) - (attempt.score or 0)
             viol_list = [v.type for v in violations]
             
-            if current_user.role == "student":
+            if is_student:
                 prompt = (
                     f"You are an academic mentor. A student named {student.name if student else 'Student'} "
                     f"has completed the exam '{exam.title if exam else 'Exam'}' scoring {attempt.score or 0} "
@@ -92,11 +94,19 @@ def get_attempt_report(
                 
             response = model.generate_content(prompt)
             ai_insight = response.text.strip()
+
+            # Cache the generated insight in database
+            if is_student:
+                attempt.student_insight = ai_insight
+            else:
+                attempt.teacher_insight = ai_insight
+            db.commit()
+
         except Exception as ai_err:
             ai_insight = f"Could not generate live AI insights: {str(ai_err)}"
     else:
         # Default mock advice if API key is not present
-        if current_user.role == "student":
+        if is_student:
             ai_insight = "AI Tip: Try reviewing the incorrect topics. Ensure you keep your eyes focused on the screen to avoid face-tracking warnings next time."
         else:
             ai_insight = f"Proctor Audit: Candidate logged {len(violations)} warnings. cheater risk assessment level is low. Monitor tab visibility logs."

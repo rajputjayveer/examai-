@@ -28,11 +28,17 @@ def list_exams(
         # Find attempts for this user
         user_attempts = db.query(Attempt).filter(Attempt.student_id == current_user.id).all()
         attempt_map = {att.exam_id: att.status for att in user_attempts}
+        attempt_id_map = {att.exam_id: att.id for att in user_attempts}
+        attempt_score_map = {att.exam_id: att.score for att in user_attempts}
         
         response_data = []
         for e in exams:
             status_val = attempt_map.get(e.id)
             has_submitted = status_val in ["submitted", "graded"]
+            
+            # Count questions to know total marks possible
+            total_questions = db.query(Question).filter(Question.exam_id == e.id).count()
+
             response_data.append({
                 "id": e.id,
                 "teacher_id": e.teacher_id,
@@ -42,7 +48,10 @@ def list_exams(
                 "end_at": e.end_at,
                 "status": e.status,
                 "created_at": e.created_at,
-                "user_has_submitted": has_submitted
+                "user_has_submitted": has_submitted,
+                "user_attempt_id": attempt_id_map.get(e.id),
+                "user_score": attempt_score_map.get(e.id),
+                "total_marks": total_questions
             })
         return response_data
 

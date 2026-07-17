@@ -53,7 +53,7 @@ def log_violation(
     db.refresh(violation)
     return violation
 
-from app.services.face_service import compare_descriptors
+from app.services.face_service import verify_faces
 
 @router.post("/identity-check")
 def identity_check(
@@ -71,7 +71,10 @@ def identity_check(
     if not current_user.face_descriptor:
         return {"verified": False, "reason": "no_reference_enrolled"}
 
-    is_match, distance = compare_descriptors(current_user.face_descriptor, check_in.descriptor)
+    # Resolve full path to reference.jpg
+    ref_path = os.path.join(STORAGE_DIR, "faces", str(current_user.id), "reference.jpg")
+
+    is_match, distance = verify_faces(ref_path, check_in.snapshot)
 
     if not is_match:
         violation = Violation(

@@ -35,6 +35,9 @@ class ExamResponse(ExamBase):
     status: str
     created_at: datetime
     user_has_submitted: Optional[bool] = False
+    user_attempt_id: Optional[int] = None
+    user_score: Optional[int] = None
+    total_marks: Optional[int] = None
 
     class Config:
         from_attributes = True
