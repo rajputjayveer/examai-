@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.exam import Exam
 from app.models.question import Question
 from app.models.attempt import Attempt
+from app.models.answer import Answer
 from app.schemas.exam import ExamCreate, ExamResponse, QuestionCreate, QuestionResponse, ExamDetailResponse
 
 router = APIRouter()
@@ -99,6 +100,86 @@ def add_questions(
         db.refresh(q)
     return added_questions
 
+@router.get("/{exam_id}/questions", response_model=List[QuestionResponse])
+def get_questions(
+    exam_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Return questions for an exam — used by the AnswerKey builder UI."""
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    return db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order_index).all()
+
+
+class AnswerKeyItem(BaseModel if False else object):
+    pass
+
+from pydantic import BaseModel
+
+class AnswerKeyEntry(BaseModel):
+    question_id: int
+    correct_option: str  # 'A', 'B', 'C', or 'D'
+
+@router.post("/{exam_id}/answer-key")
+def upload_answer_key(
+    exam_id: int,
+    entries: List[AnswerKeyEntry],
+    current_user: User = Depends(RoleChecker(["teacher"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Save correct options per question, then auto-evaluate ALL submitted
+    attempts for this exam immediately (no per-student manual step needed).
+    """
+    exam = db.query(Exam).filter(Exam.id == exam_id, Exam.teacher_id == current_user.id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    # 1. Save correct options
+    for entry in entries:
+        question = db.query(Question).filter(
+            Question.id == entry.question_id,
+            Question.exam_id == exam_id
+        ).first()
+        if question:
+            question.correct_option = entry.correct_option.upper()
+
+    db.commit()
+
+    # 2. Auto-evaluate all submitted attempts for this exam
+    questions = db.query(Question).filter(Question.exam_id == exam_id).all()
+    correct_map = {q.id: q.correct_option for q in questions if q.correct_option}
+    total = len(questions)
+
+    attempts = db.query(Attempt).filter(
+        Attempt.exam_id == exam_id,
+        Attempt.status.in_(["submitted", "ongoing"])
+    ).all()
+
+    evaluated_count = 0
+    for attempt in attempts:
+        student_answers = db.query(Answer).filter(Answer.attempt_id == attempt.id).all()
+        score = sum(
+            1.0 for ans in student_answers
+            if correct_map.get(ans.question_id) == ans.selected_option
+        )
+        attempt.score = score
+        attempt.status = "graded"
+        evaluated_count += 1
+
+    # Mark exam as evaluated
+    exam.status = "evaluated"
+    db.commit()
+
+    return {
+        "detail": "Answer key saved and auto-evaluation complete.",
+        "evaluated_attempts": evaluated_count,
+        "total_questions": total
+    }
+
+
 @router.post("/upload-pdf")
 def upload_pdf_exam(
     file: UploadFile = File(...),
@@ -123,4 +204,3 @@ def upload_pdf_exam(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-

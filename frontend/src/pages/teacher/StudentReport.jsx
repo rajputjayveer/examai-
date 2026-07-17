@@ -14,66 +14,69 @@ export default function StudentReport() {
         setReport(res.data);
         setLoading(false);
       })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   }, [attemptId]);
 
   const downloadPdf = () => {
     window.open(`/api/reports/${attemptId}/pdf`, '_blank');
   };
 
-  if (loading) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500">Loading student report...</div>;
-  }
+  if (loading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-4 border-brand-200 border-t-brand-600 animate-spin" />
+    </div>
+  );
+
+  if (!report) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-500">Report details could not be found.</p>
+    </div>
+  );
 
   const { attempt, student_name, exam_title, violations, answers } = report;
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6">
-      <div className="max-w-6xl mx-auto">
-        <header className="flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Candidate Exam Report</h1>
-            <p className="text-slate-400 text-sm">Reviewing attempt details for {student_name}</p>
+            <h1 className="text-xl font-bold text-slate-900 font-display">Candidate Proctoring Report</h1>
+            <p className="text-xs text-slate-500">Attempt review for {student_name}</p>
           </div>
-          <div className="flex gap-4">
-            <button
-              onClick={downloadPdf}
-              className="px-4 py-2 bg-brand-500 hover:bg-brand-600 rounded-lg text-sm font-semibold transition text-white"
-            >
+          <div className="flex gap-3">
+            <button onClick={downloadPdf} className="btn-primary py-2 text-xs">
               Download PDF Report
             </button>
-            <button
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 bg-slate-850 hover:bg-slate-800 rounded-lg text-sm border border-slate-855"
-            >
+            <button onClick={() => navigate(-1)} className="btn-secondary py-2 text-xs">
               Back
             </button>
           </div>
-        </header>
+        </div>
+      </header>
 
+      <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content: Answers & Questions */}
           <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-semibold text-white">Question Breakdown</h2>
+            <h2 className="text-base font-bold text-slate-900 font-display">Question Breakdown</h2>
             <div className="space-y-4">
               {answers.map((ans, idx) => {
                 const isCorrect = ans.selected_option === ans.correct_option;
                 return (
-                  <div key={idx} className="glass-panel p-6 rounded-xl border border-slate-850">
-                    <h3 className="text-slate-200 font-medium mb-3">{idx + 1}. {ans.question_text}</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-slate-450 mb-4">
+                  <div key={idx} className="bg-white border border-slate-200 rounded-2xl shadow-card p-6">
+                    <h3 className="text-slate-900 font-semibold mb-3">{idx + 1}. {ans.question_text}</h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 mb-4">
                       <p>A: {ans.option_a}</p>
                       <p>B: {ans.option_b}</p>
                       <p>C: {ans.option_c}</p>
                       <p>D: {ans.option_d}</p>
                     </div>
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-slate-400">Selected Answer: <span className={isCorrect ? 'text-green-500' : 'text-red-500'}>{ans.selected_option}</span></span>
+                    <div className="flex justify-between items-center text-xs font-semibold pt-3 border-t border-slate-100">
+                      <span className="text-slate-500">
+                        Selected: <span className={isCorrect ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>{ans.selected_option || 'None'}</span>
+                      </span>
                       {ans.correct_option && (
-                        <span className="text-green-500">Correct Answer: {ans.correct_option}</span>
+                        <span className="text-emerald-600">Correct Answer: {ans.correct_option}</span>
                       )}
                     </div>
                   </div>
@@ -84,37 +87,49 @@ export default function StudentReport() {
 
           {/* Right Column: Violation log & details */}
           <div className="space-y-6">
-            <div className="glass-panel p-6 rounded-xl border border-slate-850">
-              <h3 className="text-lg font-semibold mb-4 text-white">Summary</h3>
-              <div className="space-y-2 text-sm">
+            {/* Summary */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6">
+              <h3 className="text-base font-bold text-slate-950 mb-4 font-display">Performance Summary</h3>
+              <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Score:</span>
-                  <span className="text-white font-bold">{attempt.score !== null ? `${attempt.score} Marks` : 'Pending'}</span>
+                  <span className="text-slate-500">Exam Title</span>
+                  <span className="font-semibold text-slate-800 text-right max-w-[150px] truncate">{exam_title}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Violations logged:</span>
-                  <span className={`font-bold ${violations.length > 0 ? 'text-red-500' : 'text-slate-200'}`}>
+                  <span className="text-slate-500">Score Achieved</span>
+                  <span className="font-bold text-slate-900">{attempt.score !== null ? `${attempt.score} Marks` : 'Pending'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Logged Violations</span>
+                  <span className={`font-bold ${violations.length > 0 ? 'text-red-600 animate-pulse' : 'text-emerald-600'}`}>
                     {violations.length}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="glass-panel p-6 rounded-xl border border-slate-850">
-              <h3 className="text-lg font-semibold mb-4 text-white">Violation Evidence Logs</h3>
+            {/* Violation Feed */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6">
+              <h3 className="text-base font-bold text-slate-950 mb-4 font-display">Violations Feed</h3>
               {violations.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">No violations logged during the exam.</p>
+                <p className="text-xs text-slate-500">No violations recorded. Candidate followed all guidelines.</p>
               ) : (
                 <div className="space-y-4">
-                  {violations.map(v => (
-                    <div key={v.id} className="border-b border-slate-850 pb-4 last:border-b-0 last:pb-0">
-                      <div className="flex justify-between text-xs text-slate-400 mb-2">
-                        <span className="font-semibold text-red-500 uppercase">{v.type}</span>
-                        <span>{new Date(v.created_at).toLocaleTimeString()}</span>
+                  {violations.map((v, i) => (
+                    <div key={i} className="p-3 border border-red-100 bg-red-50/50 rounded-xl text-xs space-y-2">
+                      <div className="flex justify-between font-bold text-red-700">
+                        <span className="uppercase">{v.type}</span>
+                        <span>{v.timestamp ? new Date(v.timestamp).toLocaleTimeString() : ''}</span>
                       </div>
+                      <p className="text-slate-650">{v.description || 'Proctor warning triggered.'}</p>
                       {v.evidence_path && (
-                        <div className="aspect-video w-full rounded bg-slate-900 overflow-hidden border border-slate-800">
-                          <img src={`/api/storage/${v.evidence_path}`} alt="Evidence screenshot" className="w-full h-full object-cover" />
+                        <div className="relative aspect-video rounded-lg overflow-hidden border border-red-200 bg-slate-100">
+                          <img
+                            src={`http://localhost:8000/api/storage/${v.evidence_path}`}
+                            alt="Violation Snapshot"
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
                         </div>
                       )}
                     </div>
@@ -124,7 +139,7 @@ export default function StudentReport() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

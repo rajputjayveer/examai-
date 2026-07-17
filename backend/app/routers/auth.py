@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.deps import get_current_active_user
 from app.db.base import get_db
 from app.models.user import User
 from app.models.otp import OTPVerification
@@ -92,13 +93,13 @@ def verify_otp(email: str, otp_code: str, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Check if admin is trying to login via login endpoint
+    # Admin login is restricted and handled separately or using virtual comparison in admin endpoint
     if form_data.username == settings.ADMIN_USERNAME and form_data.password == settings.ADMIN_PASSWORD:
         access_token = create_access_token(subject="admin_user")
         return {"access_token": access_token, "token_type": "bearer"}
 
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+    if not user or user.role == "admin" or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password"
@@ -111,6 +112,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         
     access_token = create_access_token(subject=user.email)
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 @router.post("/admin/create-teacher", response_model=UserResponse)
 def create_teacher(
@@ -140,3 +142,14 @@ def create_teacher(
     db.refresh(db_user)
     return db_user
 
+
+@router.get("/me")
+def get_current_user_profile(current_user: User = Depends(get_current_active_user)):
+    """Return the logged-in user's profile — works for student, teacher, and admin roles."""
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "face_enrolled": getattr(current_user, "face_enrolled", True),
+    }

@@ -24,7 +24,7 @@ export default function JoinExam() {
   }, [examId, user, loading, navigate]);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-550">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500">
       Redirecting you to the exam room...
     </div>
   );

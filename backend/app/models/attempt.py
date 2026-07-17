@@ -12,7 +12,7 @@ class Attempt(Base):
     started_at = Column(DateTime, server_default=func.now())
     submitted_at = Column(DateTime, nullable=True)
     score = Column(Float, nullable=True)
-    status = Column(String, default="ongoing") # "ongoing", "submitted", "graded"
+    status = Column(String(50), default="ongoing") # "ongoing", "submitted", "graded"
 
     exam = relationship("Exam", back_populates="attempts")
     answers = relationship("Answer", back_populates="attempt", cascade="all, delete-orphan")

@@ -16,6 +16,7 @@ export default function CreateExam() {
   const [optD, setOptD] = useState('');
   const [correctOpt, setCorrectOpt] = useState('A');
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
   
   const navigate = useNavigate();
 
@@ -35,7 +36,6 @@ export default function CreateExam() {
     };
     setQuestions([...questions, newQ]);
     
-    // Clear inputs
     setQText('');
     setOptA('');
     setOptB('');
@@ -53,25 +53,18 @@ export default function CreateExam() {
     }
 
     try {
-      // Create Exam
       const examRes = await client.post('/exams', {
         title,
         duration_minutes: parseInt(duration),
         start_at: new Date(startAt).toISOString(),
         end_at: new Date(endAt).toISOString()
       });
-      
-      // Save Questions
       await client.post(`/exams/${examRes.data.id}/questions`, questions);
-      
       navigate('/teacher/exams');
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError('Failed to create exam. Please check input values.');
     }
   };
-
-  const [uploading, setUploading] = useState(false);
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
@@ -88,7 +81,6 @@ export default function CreateExam() {
       });
       setQuestions(res.data.questions);
     } catch (err) {
-      console.error(err);
       setError(err.response?.data?.detail || 'Failed to parse PDF questions using Gemini.');
     } finally {
       setUploading(false);
@@ -96,174 +88,94 @@ export default function CreateExam() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6">
-      <div className="max-w-4xl mx-auto glass-panel border border-slate-800 rounded-2xl p-8 shadow-2xl">
-        <h2 className="text-2xl font-bold mb-2 text-white">Create New Exam</h2>
-        
-        {/* PDF Question Extractor Box */}
-        <div className="mb-6 bg-slate-900/40 border border-slate-850 p-5 rounded-xl">
-          <h3 className="text-sm font-semibold text-slate-350 mb-2">AI PDF Question & Answer Key Extractor</h3>
-          <p className="text-xs text-slate-400 mb-4">
-            Upload an exam question paper PDF. Gemini will automatically extract the MCQ questions, options, and build the correct answer key.
-          </p>
-          <div className="flex items-center gap-4">
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handlePdfUpload}
-              disabled={uploading}
-              className="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-500/10 file:text-brand-450 hover:file:bg-brand-500/20 disabled:opacity-50"
-            />
-            {uploading && <span className="text-xs text-brand-500 animate-pulse font-semibold">Gemini processing...</span>}
+    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-card p-6 sm:p-8">
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 font-display">Create Proctored Exam</h1>
+            <p className="text-xs text-slate-500">Configure exam settings and input questions</p>
           </div>
+          <button onClick={() => navigate('/teacher/exams')} className="btn-secondary py-2 text-xs">
+            Back
+          </button>
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
+          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-750 font-medium">
             {error}
           </div>
         )}
 
         <form onSubmit={handleCreateExam} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Exam Details */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300">Exam Title</label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none"
-                placeholder="Midterm Exam"
-              />
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Exam Title</label>
+              <input type="text" required value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="Midterm Exam" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300">Duration (Minutes)</label>
-              <input
-                type="number"
-                required
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none"
-              />
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Duration (minutes)</label>
+              <input type="number" required value={duration} onChange={e => setDuration(e.target.value)} className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300">Start Time</label>
-              <input
-                type="datetime-local"
-                required
-                value={startAt}
-                onChange={(e) => setStartAt(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-              />
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Start Time</label>
+              <input type="datetime-local" required value={startAt} onChange={e => setStartAt(e.target.value)} className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300">End Time</label>
-              <input
-                type="datetime-local"
-                required
-                value={endAt}
-                onChange={(e) => setEndAt(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-              />
+              <label className="block text-xs font-semibold text-slate-700 mb-1">End Time</label>
+              <input type="datetime-local" required value={endAt} onChange={e => setEndAt(e.target.value)} className="input" />
             </div>
           </div>
 
-          {/* Question Builder */}
-          <div className="border-t border-slate-800 pt-6">
-            <h3 className="text-lg font-semibold mb-4 text-slate-200">Add Questions</h3>
-            <div className="space-y-4 bg-slate-900/30 p-4 rounded-xl border border-slate-850">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400">Question Text</label>
-                <textarea
-                  value={qText}
-                  onChange={(e) => setQText(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none h-20 resize-none"
-                  placeholder="What is the capital of France?"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400">Option A</label>
-                  <input
-                    type="text"
-                    value={optA}
-                    onChange={(e) => setOptA(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400">Option B</label>
-                  <input
-                    type="text"
-                    value={optB}
-                    onChange={(e) => setOptB(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400">Option C</label>
-                  <input
-                    type="text"
-                    value={optC}
-                    onChange={(e) => setOptC(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400">Option D</label>
-                  <input
-                    type="text"
-                    value={optD}
-                    onChange={(e) => setOptD(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-                  />
+          {/* AI PDF Upload */}
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-5">
+            <h3 className="text-sm font-bold text-brand-800 mb-2">✨ AI-Powered Question Paper Import</h3>
+            <p className="text-xs text-brand-650 mb-4">Upload a PDF containing multiple-choice questions. Gemini AI will automatically extract and parse them into the exam.</p>
+            <input type="file" accept=".pdf" onChange={handlePdfUpload} className="hidden" id="pdf-upload-input" disabled={uploading} />
+            <label htmlFor="pdf-upload-input" className="inline-block btn-primary text-xs cursor-pointer">
+              {uploading ? 'Processing PDF with Gemini...' : 'Upload PDF Exam Paper'}
+            </label>
+          </div>
+
+          {/* Questions List */}
+          <div className="space-y-3">
+            <h3 className="text-base font-bold text-slate-900 font-display">Questions Added ({questions.length})</h3>
+            {questions.map((q, idx) => (
+              <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm relative">
+                <span className="absolute top-4 right-4 text-xs font-bold text-brand-600">Correct: {q.correct_option}</span>
+                <p className="font-semibold text-slate-800 mb-2">{idx + 1}. {q.text}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-650">
+                  <p>A: {q.option_a}</p>
+                  <p>B: {q.option_b}</p>
+                  <p>C: {q.option_c}</p>
+                  <p>D: {q.option_d}</p>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400">Correct Option</label>
-                <select
-                  value={correctOpt}
-                  onChange={(e) => setCorrectOpt(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-2.5 text-white focus:border-brand-500 focus:outline-none"
-                >
-                  <option value="A">Option A</option>
-                  <option value="B">Option B</option>
-                  <option value="C">Option C</option>
-                  <option value="D">Option D</option>
+            ))}
+          </div>
+
+          {/* Add Question Form */}
+          <div className="border-t border-slate-200 pt-6">
+            <h3 className="text-base font-bold text-slate-900 mb-4 font-display">Add Custom Question</h3>
+            <div className="space-y-4">
+              <input type="text" value={qText} onChange={e => setQText(e.target.value)} className="input" placeholder="Enter question text" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input type="text" value={optA} onChange={e => setOptA(e.target.value)} className="input" placeholder="Option A" />
+                <input type="text" value={optB} onChange={e => setOptB(e.target.value)} className="input" placeholder="Option B" />
+                <input type="text" value={optC} onChange={e => setOptC(e.target.value)} className="input" placeholder="Option C" />
+                <input type="text" value={optD} onChange={e => setOptD(e.target.value)} className="input" placeholder="Option D" />
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="text-xs font-semibold text-slate-700">Correct Option:</label>
+                <select value={correctOpt} onChange={e => setCorrectOpt(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm">
+                  {['A', 'B', 'C', 'D'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                <button type="button" onClick={addQuestion} className="btn-secondary py-2 text-xs font-bold">+ Add to Exam</button>
               </div>
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-sm font-semibold rounded-lg border border-slate-700 text-slate-200 transition"
-              >
-                Add Question to Exam ({questions.length} added)
-              </button>
             </div>
           </div>
 
-          {/* List of current questions */}
-          {questions.length > 0 && (
-            <div className="space-y-2 mt-4">
-              <h4 className="font-semibold text-sm text-slate-400">Questions added:</h4>
-              <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
-                {questions.map((q, idx) => (
-                  <div key={idx} className="bg-slate-900/20 border border-slate-850 p-3 rounded-lg text-sm flex justify-between">
-                    <span>{idx + 1}. {q.text}</span>
-                    <span className="text-green-500 font-bold">Ans: {q.correct_option}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="w-full mt-6 py-3 bg-brand-500 hover:bg-brand-600 rounded-lg text-sm font-bold text-white transition"
-          >
-            Save Exam
-          </button>
+          <button type="submit" className="w-full btn-primary py-3">Create Exam & Save Questions</button>
         </form>
       </div>
     </div>

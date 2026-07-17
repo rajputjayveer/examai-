@@ -7,12 +7,12 @@ class Question(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     exam_id = Column(Integer, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
-    text = Column(String, nullable=False)
-    option_a = Column(String, nullable=False)
-    option_b = Column(String, nullable=False)
-    option_c = Column(String, nullable=False)
-    option_d = Column(String, nullable=False)
-    correct_option = Column(String, nullable=True) # "A", "B", "C", "D" (nullable until answer key is released)
+    text = Column(String(500), nullable=False)
+    option_a = Column(String(255), nullable=False)
+    option_b = Column(String(255), nullable=False)
+    option_c = Column(String(255), nullable=False)
+    option_d = Column(String(255), nullable=False)
+    correct_option = Column(String(10), nullable=True) # "A", "B", "C", "D" (nullable until answer key is released)
     order_index = Column(Integer, default=0)
 
     exam = relationship("Exam", back_populates="questions")

@@ -8,11 +8,11 @@ class Exam(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     teacher_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    title = Column(String, nullable=False)
+    title = Column(String(255), nullable=False)
     duration_minutes = Column(Integer, nullable=False)
     start_at = Column(DateTime, nullable=False)
     end_at = Column(DateTime, nullable=False)
-    status = Column(String, default="draft") # "draft", "published", "closed"
+    status = Column(String(50), default="draft") # "draft", "published", "closed"
     created_at = Column(DateTime, server_default=func.now())
 
     questions = relationship("Question", back_populates="exam", cascade="all, delete-orphan")

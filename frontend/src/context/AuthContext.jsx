@@ -9,9 +9,10 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async () => {
     try {
-      const response = await client.get('/students/profile');
+      // /auth/me works for student, teacher, and admin — no role-specific endpoint
+      const response = await client.get('/auth/me');
       setUser(response.data);
-    } catch (error) {
+    } catch {
       localStorage.removeItem('token');
       setUser(null);
     } finally {
@@ -32,13 +33,9 @@ export const AuthProvider = ({ children }) => {
     const params = new URLSearchParams();
     params.append('username', email);
     params.append('password', password);
-
     const response = await client.post('/auth/login', params, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-
     localStorage.setItem('token', response.data.access_token);
     await fetchProfile();
   };
