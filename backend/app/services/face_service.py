@@ -8,9 +8,9 @@ from deepface import DeepFace
 # FaceNet512 default threshold is around 0.30 (Cosine) or 10.0 (L2 Euclidean)
 # VGG-Face default threshold is around 0.40 (Cosine) or 0.60 (L2 Euclidean)
 # Using VGG-Face model by default as it is lightweight and performs fast on CPU.
-MODEL_NAME = "VGG-Face"
+MODEL_NAME = "ArcFace"
 DISTANCE_METRIC = "cosine"
-MATCH_THRESHOLD = 0.28
+MATCH_THRESHOLD = 0.48
 
 def save_base64_image(base64_str: str, file_path: str):
     """Decode base64 string and save it to file path."""

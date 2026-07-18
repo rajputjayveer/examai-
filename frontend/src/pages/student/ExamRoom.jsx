@@ -37,6 +37,7 @@ export default function ExamRoom() {
   const [timeLeft, setTimeLeft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Proctoring state
   const [faceCount, setFaceCount] = useState(1);    // 1 = normal
@@ -137,13 +138,31 @@ export default function ExamRoom() {
   };
 
   const stopCamera = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        console.warn('Failed to stop streamRef tracks:', e);
+      }
+      streamRef.current = null;
+    }
+    if (videoRef.current && videoRef.current.srcObject) {
+      try {
+        const srcStream = videoRef.current.srcObject;
+        if (srcStream && typeof srcStream.getTracks === 'function') {
+          srcStream.getTracks().forEach(t => t.stop());
+        }
+      } catch (e) {
+        console.warn('Failed to stop srcObject tracks:', e);
+      }
+      videoRef.current.srcObject = null;
+    }
     clearInterval(faceIntervalRef.current);
     clearInterval(identityIntervalRef.current);
     clearInterval(audioIntervalRef.current);
     if (audioCtxRef.current) {
       try {
-        audioCtxRef.current.close();
+        audioCtxRef.current.close().catch(() => {});
       } catch {}
     }
     clearTimeout(timerRef.current);
@@ -244,7 +263,12 @@ export default function ExamRoom() {
       if (res.data?.auto_submitted) {
         setViolationMsg('⚠ Maximum violations reached — your exam has been auto-submitted.');
         stopCamera();
-        setTimeout(() => navigate(`/student/result/${attemptId}`), 2000);
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        setTimeout(() => {
+          window.location.href = `/student/result/${attemptId}`;
+        }, 2000);
       }
     } catch { /* silent */ }
   }, [attemptId, navigate]);
@@ -327,18 +351,19 @@ export default function ExamRoom() {
     if (submitting) return;
     setSubmitting(true);
     stopCamera();
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
     try {
       await client.post(`/attempts/${attemptId}/submit`);
-      navigate(`/student/result/${attemptId}`);
+      window.location.href = `/student/result/${attemptId}`;
     } catch {
       setSubmitting(false);
     }
   };
 
   const confirmSubmit = () => {
-    if (window.confirm('Are you sure you want to submit the exam? This cannot be undone.')) {
-      handleSubmit();
-    }
+    setShowConfirmModal(true);
   };
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -440,11 +465,45 @@ export default function ExamRoom() {
 
       {/* ── Fixed top-right violation toast (non-obstructive UI) ── */}
       {violationMsg && (
-        <div className="fixed top-20 right-4 z-50 max-w-sm bg-red-650 text-white shadow-lg rounded-xl py-3 px-4 text-xs font-bold flex items-center gap-2 border border-red-500 animate-slide-up">
+        <div className="fixed top-20 right-4 z-50 max-w-sm bg-red-600 text-white shadow-lg rounded-xl py-3 px-4 text-xs font-bold flex items-center gap-2 border border-red-500 animate-slide-up">
           <svg className="w-4 h-4 text-white flex-shrink-0 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <span>{violationMsg}</span>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200 animate-scale-up space-y-4">
+            <div className="flex items-center justify-center w-12 h-12 bg-amber-50 rounded-full border border-amber-200 mx-auto text-amber-500">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-slate-950 font-display">Submit Exam?</h3>
+              <p className="text-xs text-slate-500">Are you sure you want to submit your exam answers? This action is permanent and cannot be undone.</p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-250 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleSubmit();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shadow-sm"
+              >
+                Yes, Submit
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -513,13 +572,22 @@ export default function ExamRoom() {
                 >
                   ← Previous
                 </button>
-                <button
-                  onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
-                  disabled={currentQ === questions.length - 1}
-                  className="btn-primary"
-                >
-                  Next →
-                </button>
+                {currentQ === questions.length - 1 ? (
+                  <button
+                    onClick={confirmSubmit}
+                    disabled={submitting}
+                    className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold transition shadow-sm disabled:opacity-50"
+                  >
+                    {submitting ? 'Submitting…' : 'Submit Exam ✓'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setCurrentQ(q => Math.min(questions.length - 1, q + 1))}
+                    className="btn-primary"
+                  >
+                    Next →
+                  </button>
+                )}
               </div>
             </div>
           )}

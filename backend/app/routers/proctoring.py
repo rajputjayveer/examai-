@@ -57,24 +57,8 @@ def log_violation(
     db.refresh(violation)
 
     # ── Auto-submit lockout ──────────────────────────────────────────────
+    # Lockout logic disabled - only flag and log violations
     auto_submitted = False
-    if attempt.status == "ongoing":
-        violation_count = db.query(Violation).filter(Violation.attempt_id == attempt.id).count()
-        if violation_count >= MAX_VIOLATIONS_BEFORE_AUTO_SUBMIT:
-            attempt.submitted_at = datetime.utcnow()
-            attempt.status = "submitted"
-
-            questions = db.query(Question).filter(Question.exam_id == attempt.exam_id).all()
-            correct_answers = {q.id: q.correct_option for q in questions if q.correct_option is not None}
-            if questions and len(correct_answers) == len(questions):
-                student_answers = db.query(Answer).filter(Answer.attempt_id == attempt.id).all()
-                attempt.score = sum(
-                    1.0 for a in student_answers if correct_answers.get(a.question_id) == a.selected_option
-                )
-                attempt.status = "graded"
-
-            db.commit()
-            auto_submitted = True
 
     return {
         "id": violation.id,
@@ -109,10 +93,25 @@ def identity_check(
     is_match, distance = verify_faces(ref_path, check_in.snapshot)
 
     if not is_match:
+        evidence_path = None
+        if check_in.snapshot:
+            attempt_dir = os.path.join(STORAGE_DIR, "evidence", str(attempt.id))
+            os.makedirs(attempt_dir, exist_ok=True)
+            filename = f"{int(datetime.utcnow().timestamp())}_identity_mismatch.jpg"
+            file_path = os.path.join(attempt_dir, filename)
+            try:
+                header, encoded = check_in.snapshot.split(",", 1) if "," in check_in.snapshot else ("", check_in.snapshot)
+                img_data = base64.b64decode(encoded)
+                with open(file_path, "wb") as f:
+                    f.write(img_data)
+                evidence_path = f"evidence/{attempt.id}/{filename}"
+            except Exception as e:
+                print("Failed to save identity check snapshot:", e)
+
         violation = Violation(
             attempt_id=attempt.id,
             type="identity_mismatch",
-            evidence_path=None
+            evidence_path=evidence_path
         )
         db.add(violation)
         db.commit()

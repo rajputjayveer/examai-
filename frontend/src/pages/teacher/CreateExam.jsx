@@ -60,20 +60,37 @@ export default function CreateExam() {
     fetchExam();
   }, [examId]);
 
-  useEffect(() => {
-    if (!startAt || !duration) return;
-    const startDate = new Date(startAt);
-    if (isNaN(startDate.getTime())) return;
-    
-    const durationMins = parseInt(duration);
-    if (isNaN(durationMins)) return;
+  const handleStartAtChange = (val) => {
+    setStartAt(val);
+    if (val && duration) {
+      const startDate = new Date(val);
+      if (!isNaN(startDate.getTime())) {
+        const durationMins = parseInt(duration);
+        if (!isNaN(durationMins)) {
+          const endDate = new Date(startDate.getTime() + durationMins * 60 * 1000);
+          const pad = (n) => String(n).padStart(2, '0');
+          const localStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+          setEndAt(localStr);
+        }
+      }
+    }
+  };
 
-    const endDate = new Date(startDate.getTime() + durationMins * 60 * 1000);
-    
-    const pad = (n) => String(n).padStart(2, '0');
-    const localStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
-    setEndAt(localStr);
-  }, [startAt, duration]);
+  const handleDurationChange = (val) => {
+    setDuration(val);
+    if (startAt && val) {
+      const startDate = new Date(startAt);
+      if (!isNaN(startDate.getTime())) {
+        const durationMins = parseInt(val);
+        if (!isNaN(durationMins)) {
+          const endDate = new Date(startDate.getTime() + durationMins * 60 * 1000);
+          const pad = (n) => String(n).padStart(2, '0');
+          const localStr = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+          setEndAt(localStr);
+        }
+      }
+    }
+  };
 
   const addQuestion = (e) => {
     e.preventDefault();
@@ -223,11 +240,11 @@ export default function CreateExam() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Duration (Minutes)</label>
-              <input type="number" required value={duration} onChange={e => setDuration(e.target.value)} className="input" />
+              <input type="number" required value={duration} onChange={e => handleDurationChange(e.target.value)} className="input" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Start Time</label>
-              <input type="datetime-local" required value={startAt} onChange={e => setStartAt(e.target.value)} className="input" />
+              <input type="datetime-local" required value={startAt} onChange={e => handleStartAtChange(e.target.value)} className="input" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">End Time</label>
