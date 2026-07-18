@@ -19,9 +19,9 @@ async function loadFaceApi() {
       faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODEL_URL)
     ]);
     faceApiReady = true;
-    console.log('[ExamGuard] face-api.js tinyFaceDetector + faceLandmark68Net + faceRecognitionNet loaded ✓');
+    console.log('[SecureExam] face-api.js tinyFaceDetector + faceLandmark68Net + faceRecognitionNet loaded ✓');
   } catch (e) {
-    console.warn('[ExamGuard] face-api.js failed to load — face detection disabled:', e.message);
+    console.warn('[SecureExam] face-api.js failed to load — face detection disabled:', e.message);
   }
 }
 
@@ -50,6 +50,8 @@ export default function ExamRoom() {
   const streamRef = useRef(null);
   const faceIntervalRef = useRef(null);
   const identityIntervalRef = useRef(null);
+  const audioIntervalRef = useRef(null);
+  const audioCtxRef = useRef(null);
   const timerRef = useRef(null);
 
   // ── Load exam data ──────────────────────────────────────────────────────────
@@ -84,7 +86,10 @@ export default function ExamRoom() {
 
   const startCamera = async () => {
     try {
-      const ms = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+      const ms = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240 },
+        audio: true
+      });
       streamRef.current = ms;
       if (videoRef.current) videoRef.current.srcObject = ms;
 
@@ -96,8 +101,38 @@ export default function ExamRoom() {
 
       // Send identity-check snapshot every 30s
       identityIntervalRef.current = setInterval(sendIdentityCheck, 30000);
+
+      // Set up Audio Context for noise tracking during exam
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtxRef.current = audioCtx;
+        const source = audioCtx.createMediaStreamSource(ms);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+
+        let noiseDuration = 0;
+        audioIntervalRef.current = setInterval(() => {
+          analyser.getByteFrequencyData(data);
+          const avg = data.reduce((a, b) => a + b, 0) / data.length;
+          const level = Math.min(100, Math.round((avg / 128) * 100));
+          // If level is above 35% for 3 consecutive seconds, log a violation
+          if (level > 35) {
+            noiseDuration += 1;
+            if (noiseDuration >= 3) {
+              triggerViolation('high_noise', '⚠ High audio / speaking detected! Please remain quiet.');
+              noiseDuration = 0;
+            }
+          } else {
+            noiseDuration = Math.max(0, noiseDuration - 1);
+          }
+        }, 1000);
+      } catch (ae) {
+        console.warn('Audio Context failed to initialize:', ae);
+      }
     } catch {
-      logViolation('camera_denied', 'Camera access denied during exam');
+      triggerViolation('camera_denied', 'Camera/Microphone access denied during exam');
     }
   };
 
@@ -105,6 +140,12 @@ export default function ExamRoom() {
     streamRef.current?.getTracks().forEach(t => t.stop());
     clearInterval(faceIntervalRef.current);
     clearInterval(identityIntervalRef.current);
+    clearInterval(audioIntervalRef.current);
+    if (audioCtxRef.current) {
+      try {
+        audioCtxRef.current.close();
+      } catch {}
+    }
     clearTimeout(timerRef.current);
   };
 
@@ -194,13 +235,19 @@ export default function ExamRoom() {
         snapshot = canvas.toDataURL('image/jpeg', 0.6);
       }
 
-      await client.post('/proctoring/violation', {
+      const res = await client.post('/proctoring/violation', {
         attempt_id: parseInt(attemptId),
         type: type,
         snapshot: snapshot
       });
+
+      if (res.data?.auto_submitted) {
+        setViolationMsg('⚠ Maximum violations reached — your exam has been auto-submitted.');
+        stopCamera();
+        setTimeout(() => navigate(`/student/result/${attemptId}`), 2000);
+      }
     } catch { /* silent */ }
-  }, [attemptId]);
+  }, [attemptId, navigate]);
 
   // ── Tab-switch, Copy-Paste, and Fullscreen Guards ───────────────────────────
   useEffect(() => {
@@ -326,7 +373,7 @@ export default function ExamRoom() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
             </div>
-            <span className="font-bold text-slate-900 text-sm font-display hidden sm:block">ExamGuard AI</span>
+            <span className="font-bold text-slate-900 text-sm font-display hidden sm:block">SecureExam AI</span>
           </div>
 
           {/* Exam title */}
@@ -393,7 +440,7 @@ export default function ExamRoom() {
 
       {/* ── Fixed top-right violation toast (non-obstructive UI) ── */}
       {violationMsg && (
-        <div className="fixed top-20 right-4 z-50 max-w-sm bg-red-600 text-white shadow-lg rounded-xl py-3 px-4 text-xs font-bold flex items-center gap-2 border border-red-500 animate-slide-up">
+        <div className="fixed top-20 right-4 z-50 max-w-sm bg-red-650 text-white shadow-lg rounded-xl py-3 px-4 text-xs font-bold flex items-center gap-2 border border-red-500 animate-slide-up">
           <svg className="w-4 h-4 text-white flex-shrink-0 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
@@ -401,10 +448,10 @@ export default function ExamRoom() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        {/* ── Left: Question panel ── */}
-        <div className="lg:col-span-3 flex flex-col gap-5">
+        {/* ── Main Workspace ── */}
+        <div className="flex flex-col gap-5">
           {/* Question card */}
           {q && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 sm:p-8 animate-fade-in">
@@ -477,101 +524,86 @@ export default function ExamRoom() {
             </div>
           )}
 
-          {/* Question navigator grid */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-5">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Question Navigator</h3>
-            <div className="flex flex-wrap gap-2">
-              {questions.map((qs, i) => (
-                <button
-                  key={qs.id}
-                  onClick={() => setCurrentQ(i)}
-                  className={`w-9 h-9 rounded-lg text-xs font-bold border-2 transition-all ${
-                    i === currentQ
-                      ? 'border-brand-600 bg-brand-600 text-white'
-                      : answers[qs.id]
-                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 bg-white text-slate-500 hover:border-brand-300'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
+          {/* Bottom Grid Info: Navigator + Proctoring status */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Question Navigator */}
+            <div className="md:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-card p-5">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Question Navigator</h3>
+              <div className="flex flex-wrap gap-2">
+                {questions.map((qs, i) => (
+                  <button
+                    key={qs.id}
+                    onClick={() => setCurrentQ(i)}
+                    className={`w-9 h-9 rounded-lg text-xs font-bold border-2 transition-all ${
+                      i === currentQ
+                        ? 'border-brand-600 bg-brand-600 text-white'
+                        : answers[qs.id]
+                          ? 'border-emerald-400 bg-emerald-55 text-emerald-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-brand-300'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-4 mt-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400" />Answered</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-brand-600" />Current</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded border-2 border-slate-350 bg-white" />Skipped</span>
+              </div>
             </div>
-            <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400" />Answered</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-brand-600" />Current</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded border-2 border-slate-300 bg-white" />Skipped</span>
-            </div>
-          </div>
-        </div>
 
-        {/* ── Right: Proctoring panel ── */}
-        <div className="flex flex-col gap-4">
-          {/* Live webcam */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Live Camera</span>
-              <span className={`w-2 h-2 rounded-full ${faceCount === 1 ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
-            </div>
-            <div className="relative bg-slate-900 aspect-video">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                style={{ transform: 'scaleX(-1)' }} // mirror
-              />
-              {/* Overlay: violation border */}
-              {faceCount !== 1 && (
-                <div className="absolute inset-0 border-4 border-red-500 rounded pointer-events-none animate-pulse" />
-              )}
-              {/* Status pill */}
-              <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold ${
-                faceCount === 1 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-              }`}>
-                {faceCount === 0 ? '⚠ No Face' : faceCount === 1 ? '✓ Verified' : `⚠ ${faceCount} Faces`}
+            {/* Proctoring Status Summary */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 flex flex-col justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">AI Proctoring Guards</h3>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Biometric Integrity</span>
+                    <span className="font-bold text-emerald-600">Active</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Browser Focus Guard</span>
+                    <span className="font-bold text-emerald-600">Active</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Noise &amp; Voice Guard</span>
+                    <span className="font-bold text-emerald-600">Active</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <canvas ref={canvasRef} width="320" height="240" className="hidden" />
-
-          {/* Proctoring status */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Proctoring Status</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Face Detection</span>
-                <span className={`font-semibold ${faceApiReady ? 'text-emerald-600' : 'text-amber-500'}`}>
-                  {faceApiReady ? '● Active' : '○ Loading'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Tab Guard</span>
-                <span className="font-semibold text-emerald-600">● Active</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600">Identity Checks</span>
-                <span className="font-semibold text-emerald-600">● Every 30s</span>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <span className="text-slate-600 font-medium">Violations</span>
-                <span className={`font-bold ${totalViolations > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                  {totalViolations}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-650 font-semibold">Total Warnings:</span>
+                <span className={`font-bold ${totalViolations > 0 ? 'text-red-650 animate-pulse' : 'text-slate-700'}`}>
+                  {totalViolations} / 5 allowed
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Exam info */}
-          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4">
-            <h3 className="text-xs font-bold text-brand-700 uppercase tracking-wider mb-2">Exam Info</h3>
-            <p className="text-xs text-brand-700">Questions: <span className="font-bold">{questions.length}</span></p>
-            <p className="text-xs text-brand-700 mt-1">Answered: <span className="font-bold">{answeredCount}</span></p>
-            <p className="text-xs text-brand-700 mt-1">Remaining: <span className="font-bold">{questions.length - answeredCount}</span></p>
           </div>
         </div>
       </div>
+
+      {/* ── Live Floating Webcam Corner Thumbnail ── */}
+      <div className="fixed bottom-4 right-4 z-40 bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700 w-44 sm:w-48 aspect-video">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-cover"
+          style={{ transform: 'scaleX(-1)' }}
+        />
+        {faceCount !== 1 && (
+          <div className="absolute inset-0 border-4 border-red-500 pointer-events-none animate-pulse" />
+        )}
+        <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded-lg text-[9px] font-bold ${
+          faceCount === 1 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white animate-pulse'
+        }`}>
+          {faceCount === 0 ? '⚠ No Face' : faceCount === 1 ? '✓ Face OK' : `⚠ ${faceCount} Faces`}
+        </div>
+      </div>
+
+      <canvas ref={canvasRef} width="320" height="240" className="hidden" />
     </div>
   );
 }

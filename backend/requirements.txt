@@ -14,5 +14,5 @@ pymysql
 pymupdf
 fastapi-mail
 google-generativeai
-
-
+pandas
+openpyxl

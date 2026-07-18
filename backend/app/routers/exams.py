@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
+import os
 
 from sqlalchemy.orm import Session
 from typing import List
@@ -14,6 +16,20 @@ from app.models.answer import Answer
 from app.schemas.exam import ExamCreate, ExamResponse, QuestionCreate, QuestionResponse, ExamDetailResponse
 
 router = APIRouter()
+
+@router.get("/templates/questions")
+def download_question_template():
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "ExamGuardAI_Question_Import_Template.xlsx"
+    )
+    if not os.path.exists(template_path):
+        raise HTTPException(status_code=404, detail="Template file not found")
+    return FileResponse(
+        template_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="ExamGuardAI_Question_Import_Template.xlsx"
+    )
 
 @router.get("", response_model=List[ExamResponse])
 def list_exams(
@@ -85,6 +101,27 @@ def get_exam(
         raise HTTPException(status_code=404, detail="Exam not found")
     return exam
 
+@router.put("/{exam_id}", response_model=ExamResponse)
+def update_exam(
+    exam_id: int,
+    exam_in: ExamCreate,
+    current_user: User = Depends(RoleChecker(["teacher"])),
+    db: Session = Depends(get_db)
+):
+    exam = db.query(Exam).filter(Exam.id == exam_id, Exam.teacher_id == current_user.id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    if exam.status == "published":
+        raise HTTPException(status_code=400, detail="Cannot edit a published exam")
+        
+    exam.title = exam_in.title
+    exam.duration_minutes = exam_in.duration_minutes
+    exam.start_at = exam_in.start_at
+    exam.end_at = exam_in.end_at
+    db.commit()
+    db.refresh(exam)
+    return exam
+
 @router.post("/{exam_id}/publish", response_model=ExamResponse)
 def publish_exam(
     exam_id: int,
@@ -110,6 +147,10 @@ def add_questions(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
         
+    # Delete existing questions first to overwrite
+    db.query(Question).filter(Question.exam_id == exam_id).delete()
+    db.commit()
+
     added_questions = []
     for idx, q_in in enumerate(questions_in):
         q = Question(
@@ -153,61 +194,48 @@ class AnswerKeyEntry(BaseModel):
     correct_option: str  # 'A', 'B', 'C', or 'D'
 
 @router.post("/{exam_id}/answer-key")
-def upload_answer_key(
+def review_and_correct_answers(
     exam_id: int,
     entries: List[AnswerKeyEntry],
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: Session = Depends(get_db)
 ):
     """
-    Save correct options per question, then auto-evaluate ALL submitted
-    attempts for this exam immediately (no per-student manual step needed).
+    The answer key is already set at question creation time, so this endpoint
+    is now a CORRECTION tool only — use it to void a disputed question
+    (correct_option=None) or fix a typo'd key, then it re-evaluates any
+    attempts already scored so nothing goes stale.
     """
     exam = db.query(Exam).filter(Exam.id == exam_id, Exam.teacher_id == current_user.id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
 
-    # 1. Save correct options
+    changed = False
     for entry in entries:
         question = db.query(Question).filter(
-            Question.id == entry.question_id,
-            Question.exam_id == exam_id
+            Question.id == entry.question_id, Question.exam_id == exam_id
         ).first()
-        if question:
-            question.correct_option = entry.correct_option.upper()
+        if question and question.correct_option != entry.correct_option:
+            question.correct_option = entry.correct_option
+            changed = True
 
-    db.commit()
+    if changed:
+        db.commit()
+        questions = db.query(Question).filter(Question.exam_id == exam_id).all()
+        correct_map = {q.id: q.correct_option for q in questions if q.correct_option}
 
-    # 2. Auto-evaluate all submitted attempts for this exam
-    questions = db.query(Question).filter(Question.exam_id == exam_id).all()
-    correct_map = {q.id: q.correct_option for q in questions if q.correct_option}
-    total = len(questions)
+        attempts = db.query(Attempt).filter(
+            Attempt.exam_id == exam_id, Attempt.status.in_(["submitted", "graded"])
+        ).all()
+        for attempt in attempts:
+            student_answers = db.query(Answer).filter(Answer.attempt_id == attempt.id).all()
+            attempt.score = sum(
+                1.0 for a in student_answers if correct_map.get(a.question_id) == a.selected_option
+            )
+            attempt.status = "graded"
+        db.commit()
 
-    attempts = db.query(Attempt).filter(
-        Attempt.exam_id == exam_id,
-        Attempt.status.in_(["submitted", "ongoing"])
-    ).all()
-
-    evaluated_count = 0
-    for attempt in attempts:
-        student_answers = db.query(Answer).filter(Answer.attempt_id == attempt.id).all()
-        score = sum(
-            1.0 for ans in student_answers
-            if correct_map.get(ans.question_id) == ans.selected_option
-        )
-        attempt.score = score
-        attempt.status = "graded"
-        evaluated_count += 1
-
-    # Mark exam as evaluated
-    exam.status = "evaluated"
-    db.commit()
-
-    return {
-        "detail": "Answer key saved and auto-evaluation complete.",
-        "evaluated_attempts": evaluated_count,
-        "total_questions": total
-    }
+    return {"detail": "Corrections applied and affected attempts re-evaluated."}
 
 
 @router.post("/upload-pdf")
@@ -228,6 +256,37 @@ def upload_pdf_exam(
 
     try:
         questions = parse_pdf_questions(temp_path)
+        return {"questions": questions}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@router.post("/upload-sheet")
+def upload_sheet_exam(
+    file: UploadFile = File(...),
+    current_user: User = Depends(RoleChecker(["teacher"])),
+    db: Session = Depends(get_db)
+):
+    """Parse questions from a CSV or Excel file.
+
+    Required columns: question, option_a, option_b, option_c, option_d, correct_option
+    Returns the same {questions: [...]} shape as /upload-pdf so the frontend
+    can feed both into the same review-before-save step.
+    """
+    import tempfile
+    import os
+    from app.services.csv_parser_service import parse_csv_questions
+
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        temp_file.write(file.file.read())
+        temp_path = temp_file.name
+
+    try:
+        questions = parse_csv_questions(temp_path)
         return {"questions": questions}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

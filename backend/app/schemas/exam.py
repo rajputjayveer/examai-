@@ -16,6 +16,7 @@ class QuestionResponse(QuestionBase):
     id: int
     exam_id: int
     order_index: int
+    correct_option: Optional[str] = None   # now visible to the teacher view
 
     class Config:
         from_attributes = True

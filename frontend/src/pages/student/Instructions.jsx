@@ -115,6 +115,7 @@ export default function Instructions() {
     'Ensure you are alone in a quiet, well-lit environment.',
     'The AI monitors your presence every few seconds.',
     'Submitting the exam or timer expiry locks your answers automatically.',
+    'Exceeding 5 proctoring warnings will auto-submit your exam immediately.',
   ];
 
   return (

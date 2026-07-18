@@ -112,7 +112,7 @@ export default function AdminPanel() {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 font-display">Admin Portal</h1>
-          <p className="mt-1 text-sm text-slate-500">ExamGuard AI Management Console</p>
+          <p className="mt-1 text-sm text-slate-500">SecureExam AI Management Console</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-card border border-slate-200 p-8">
@@ -130,7 +130,7 @@ export default function AdminPanel() {
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Admin Username</label>
               <input id="admin-username" type="text" required value={username}
                 onChange={e => setUsername(e.target.value)} className="input"
-                placeholder="admin@examguard.com" />
+                placeholder="admin@secureexam.com" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Admin Password</label>
@@ -162,7 +162,7 @@ export default function AdminPanel() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-slate-900 font-display">Admin Dashboard</h1>
-              <p className="text-xs text-slate-500">ExamGuard AI Management</p>
+              <p className="text-xs text-slate-500">SecureExam AI Management</p>
             </div>
           </div>
           <button onClick={handleLogout}
@@ -184,6 +184,22 @@ export default function AdminPanel() {
           <div className="mb-6 flex items-start gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700">
             <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" /></svg>
             {success}
+          </div>
+        )}
+
+        {/* Stats strip */}
+        {!loading && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {[
+              { label: 'Total Teachers', value: usersList.filter(u => u.role === 'teacher').length, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-250' },
+              { label: 'Total Students', value: usersList.filter(u => u.role === 'student').length, color: 'text-brand-600', bg: 'bg-brand-50 border-brand-250' },
+              { label: 'Total Exams Run', value: attemptsList.length, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-250' },
+            ].map(stat => (
+              <div key={stat.label} className={`bg-white rounded-2xl border p-5 shadow-card ${stat.bg}`}>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{stat.label}</p>
+                <p className={`text-2xl font-bold font-display mt-1.5 ${stat.color}`}>{stat.value}</p>
+              </div>
+            ))}
           </div>
         )}
 

@@ -10,7 +10,7 @@ from app.routers import auth, students, exams, attempts, proctoring, reports, ad
 init_db()
 
 app = FastAPI(
-    title="ExamGuard AI",
+    title="SecureExam AI",
     description="Proctored online exam portal backend",
     version="1.0.0"
 )
@@ -40,4 +40,4 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 @app.get("/")
 def read_root():
-    return {"message": "ExamGuard AI API is running"}
+    return {"message": "SecureExam AI API is running"}

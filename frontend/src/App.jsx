@@ -16,6 +16,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 // Student pages
 import StudentDashboard from './pages/student/Dashboard';
 import FaceEnroll from './pages/student/FaceEnroll';
+import CameraCheck from './pages/student/CameraCheck';
 import Instructions from './pages/student/Instructions';
 import ExamRoom from './pages/student/ExamRoom';
 import StudentResult from './pages/student/Result';
@@ -25,6 +26,7 @@ import TeacherExamList from './pages/teacher/ExamList';
 import CreateExam from './pages/teacher/CreateExam';
 import AnswerKey from './pages/teacher/AnswerKey';
 import ResultsDashboard from './pages/teacher/ResultsDashboard';
+import ClassAnalytics from './pages/teacher/ClassAnalytics';
 import StudentReport from './pages/teacher/StudentReport';
 
 // Admin
@@ -107,6 +109,8 @@ export default function App() {
             element={<ProtectedRoute allowedRoles={['student']}><FaceEnroll /></ProtectedRoute>} />
           <Route path="/student/dashboard"
             element={<ProtectedRoute allowedRoles={['student']}><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student/camera-check/:examId"
+            element={<ProtectedRoute allowedRoles={['student']}><CameraCheck /></ProtectedRoute>} />
           <Route path="/student/instructions/:examId"
             element={<ProtectedRoute allowedRoles={['student']}><Instructions /></ProtectedRoute>} />
           <Route path="/student/exam/:attemptId"
@@ -119,10 +123,14 @@ export default function App() {
             element={<ProtectedRoute allowedRoles={['teacher']}><TeacherExamList /></ProtectedRoute>} />
           <Route path="/teacher/create-exam"
             element={<ProtectedRoute allowedRoles={['teacher']}><CreateExam /></ProtectedRoute>} />
+          <Route path="/teacher/edit-exam/:examId"
+            element={<ProtectedRoute allowedRoles={['teacher']}><CreateExam /></ProtectedRoute>} />
           <Route path="/teacher/exam/:examId/answer-key"
             element={<ProtectedRoute allowedRoles={['teacher']}><AnswerKey /></ProtectedRoute>} />
           <Route path="/teacher/exam/:examId/results"
             element={<ProtectedRoute allowedRoles={['teacher']}><ResultsDashboard /></ProtectedRoute>} />
+          <Route path="/teacher/exam/:examId/analytics"
+            element={<ProtectedRoute allowedRoles={['teacher']}><ClassAnalytics /></ProtectedRoute>} />
           <Route path="/teacher/report/:attemptId"
             element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><StudentReport /></ProtectedRoute>} />
 

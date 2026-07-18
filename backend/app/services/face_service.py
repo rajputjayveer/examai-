@@ -10,7 +10,7 @@ from deepface import DeepFace
 # Using VGG-Face model by default as it is lightweight and performs fast on CPU.
 MODEL_NAME = "VGG-Face"
 DISTANCE_METRIC = "cosine"
-MATCH_THRESHOLD = 0.40
+MATCH_THRESHOLD = 0.28
 
 def save_base64_image(base64_str: str, file_path: str):
     """Decode base64 string and save it to file path."""
@@ -43,9 +43,10 @@ def verify_faces(reference_img_path: str, live_img_base64: str) -> tuple[bool, f
         )
 
         distance = float(result["distance"])
-        is_match = bool(result["verified"])
+        # Enforce our strict MATCH_THRESHOLD instead of DeepFace's default threshold
+        is_match = distance <= MATCH_THRESHOLD
         
-        print(f"[Face Verification] Model: {MODEL_NAME}, Distance: {distance:.4f} (Threshold: {result['threshold']}), Match: {is_match}")
+        print(f"[Face Verification] Model: {MODEL_NAME}, Distance: {distance:.4f} (Strict Threshold: {MATCH_THRESHOLD}), Match: {is_match}")
         return is_match, distance
     except Exception as e:
         print(f"[Face Verification Exception] DeepFace failed: {e}")

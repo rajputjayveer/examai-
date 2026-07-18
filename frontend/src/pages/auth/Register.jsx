@@ -19,7 +19,14 @@ export default function Register() {
       // Redirect to OTP verification page
       navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      if (err.response?.status === 403) {
+        setError(err.response.data.detail + ' Redirecting to verification page...');
+        setTimeout(() => {
+          navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+        }, 2000);
+      } else {
+        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -41,7 +48,7 @@ export default function Register() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 font-display">Join ExamGuard <span className="text-brand-600">AI</span></h1>
+          <h1 className="text-3xl font-bold text-slate-900 font-display">Join SecureExam <span className="text-brand-600">AI</span></h1>
           <p className="mt-1 text-sm text-slate-500">Student registration</p>
         </div>
 

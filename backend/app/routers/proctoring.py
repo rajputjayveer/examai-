@@ -9,13 +9,17 @@ from app.core.deps import get_current_active_user, RoleChecker
 from app.models.user import User
 from app.models.attempt import Attempt
 from app.models.violation import Violation
+from app.models.question import Question
+from app.models.answer import Answer
 from app.schemas.proctoring import ViolationCreate, ViolationResponse, IdentityCheckCreate
 
 router = APIRouter()
 
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage")
 
-@router.post("/violation", response_model=ViolationResponse)
+MAX_VIOLATIONS_BEFORE_AUTO_SUBMIT = 5
+
+@router.post("/violation")
 def log_violation(
     violation_in: ViolationCreate,
     current_user: User = Depends(RoleChecker(["student"])),
@@ -51,7 +55,35 @@ def log_violation(
     db.add(violation)
     db.commit()
     db.refresh(violation)
-    return violation
+
+    # ── Auto-submit lockout ──────────────────────────────────────────────
+    auto_submitted = False
+    if attempt.status == "ongoing":
+        violation_count = db.query(Violation).filter(Violation.attempt_id == attempt.id).count()
+        if violation_count >= MAX_VIOLATIONS_BEFORE_AUTO_SUBMIT:
+            attempt.submitted_at = datetime.utcnow()
+            attempt.status = "submitted"
+
+            questions = db.query(Question).filter(Question.exam_id == attempt.exam_id).all()
+            correct_answers = {q.id: q.correct_option for q in questions if q.correct_option is not None}
+            if questions and len(correct_answers) == len(questions):
+                student_answers = db.query(Answer).filter(Answer.attempt_id == attempt.id).all()
+                attempt.score = sum(
+                    1.0 for a in student_answers if correct_answers.get(a.question_id) == a.selected_option
+                )
+                attempt.status = "graded"
+
+            db.commit()
+            auto_submitted = True
+
+    return {
+        "id": violation.id,
+        "attempt_id": violation.attempt_id,
+        "type": violation.type,
+        "evidence_path": violation.evidence_path,
+        "created_at": violation.created_at,
+        "auto_submitted": auto_submitted
+    }
 
 from app.services.face_service import verify_faces
 

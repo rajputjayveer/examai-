@@ -1,3 +1,5 @@
+import random
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -125,7 +127,12 @@ def get_attempt_questions(
         raise HTTPException(status_code=404, detail="Exam not found")
         
     questions = db.query(Question).filter(Question.exam_id == exam.id).order_by(Question.order_index).all()
-    
+
+    # Shuffle presentation order per student — storage order (order_index) never changes.
+    # Seeding with attempt.id keeps it stable across refreshes for the same student.
+    rng = random.Random(attempt.id)
+    rng.shuffle(questions)
+
     return {
         "attempt": {
             "id": attempt.id,

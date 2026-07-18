@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = "your_email@gmail.com"
     SMTP_PASSWORD: str = ""
-    DEV_MODE: bool = True
+    DEV_MODE: bool = False
     GEMINI_API_KEY: str = ""
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str

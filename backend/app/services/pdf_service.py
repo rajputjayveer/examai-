@@ -33,7 +33,7 @@ def generate_pdf_report(
     page1.draw_rect(fitz.Rect(0, 0, 595, 120), color=(0.145, 0.388, 0.965), fill=(0.937, 0.960, 1.0), width=0)
     
     # Header Title
-    page1.insert_text(fitz.Point(36, 50), "ExamGuard AI", fontsize=24, fontname="helvetica-bold", color=(0.145, 0.388, 0.965))
+    page1.insert_text(fitz.Point(36, 50), "SecureExam AI", fontsize=24, fontname="helvetica-bold", color=(0.145, 0.388, 0.965))
     page1.insert_text(fitz.Point(36, 75), "PROCTORING ANALYSIS REPORT", fontsize=10, fontname="helvetica", color=(0.274, 0.352, 0.470))
     
     # Date Stamp
@@ -105,7 +105,7 @@ def generate_pdf_report(
             
             # Header
             page.draw_rect(fitz.Rect(0, 0, 595, 50), color=(0.145, 0.388, 0.965), fill=(0.937, 0.960, 1.0), width=0)
-            page.insert_text(fitz.Point(36, 30), "ExamGuard AI — Proctoring Evidence Snapshots", fontsize=12, fontname="helvetica-bold", color=(0.145, 0.388, 0.965))
+            page.insert_text(fitz.Point(36, 30), "SecureExam AI — Proctoring Evidence Snapshots", fontsize=12, fontname="helvetica-bold", color=(0.145, 0.388, 0.965))
             
             chunk = evidence_violations[chunk_idx:chunk_idx+4]
             grid_positions = [

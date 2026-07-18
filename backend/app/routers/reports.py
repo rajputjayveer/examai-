@@ -169,7 +169,9 @@ def download_pdf_report(
         submitted_at=attempt.submitted_at
     )
     
-    return FileResponse(pdf_path, media_type="application/pdf", filename=f"ExamGuard_Report_{attempt_id}.pdf")
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"SecureExam_Report_{attempt_id}.pdf")
+
+FLAG_FOR_REVIEW_THRESHOLD = 3
 
 @router.get("/teacher/exams/{exam_id}/results")
 def get_exam_results(
@@ -193,7 +195,142 @@ def get_exam_results(
             "score": att.score,
             "status": att.status,
             "violations_count": v_count,
+            "flagged_for_review": v_count >= FLAG_FOR_REVIEW_THRESHOLD,
             "submitted_at": att.submitted_at
         })
-        
+
+    results.sort(key=lambda r: (not r["flagged_for_review"], -r["violations_count"]))
     return results
+
+
+@router.get("/teacher/exams/{exam_id}/analytics")
+def get_exam_analytics(
+    exam_id: int,
+    current_user: User = Depends(RoleChecker(["teacher"])),
+    db: Session = Depends(get_db)
+):
+    """Return class-level analytics for an exam: avg score, question difficulty,
+    and violation type breakdown."""
+    exam = db.query(Exam).filter(Exam.id == exam_id, Exam.teacher_id == current_user.id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    attempts = db.query(Attempt).filter(
+        Attempt.exam_id == exam_id, Attempt.status.in_(["submitted", "graded"])
+    ).all()
+    questions = db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order_index).all()
+
+    if not attempts:
+        return {
+            "average_score": None,
+            "total_submissions": 0,
+            "question_difficulty": [],
+            "violation_breakdown": {}
+        }
+
+    attempt_ids = [a.id for a in attempts]
+    scored = [a.score for a in attempts if a.score is not None]
+    average_score = round(sum(scored) / len(scored), 2) if scored else None
+
+    question_difficulty = []
+    for q in questions:
+        answers = db.query(Answer).filter(
+            Answer.question_id == q.id, Answer.attempt_id.in_(attempt_ids)
+        ).all()
+        total = len(answers)
+        wrong = sum(1 for a in answers if a.selected_option != q.correct_option) if q.correct_option else None
+        question_difficulty.append({
+            "question_id": q.id,
+            "text": q.text,
+            "percent_wrong": round((wrong / total) * 100, 1) if total and wrong is not None else None
+        })
+
+    violation_rows = db.query(Violation).filter(Violation.attempt_id.in_(attempt_ids)).all()
+    violation_breakdown = {}
+    for v in violation_rows:
+        violation_breakdown[v.type] = violation_breakdown.get(v.type, 0) + 1
+
+    return {
+        "average_score": average_score,
+        "total_submissions": len(attempts),
+        "question_difficulty": question_difficulty,
+        "violation_breakdown": violation_breakdown
+    }
+
+
+@router.get("/teacher/students")
+def list_students_for_teacher(
+    current_user: User = Depends(RoleChecker(["teacher"])),
+    db: Session = Depends(get_db)
+):
+    """Return all registered students and their biometric verification status."""
+    students = db.query(User).filter(User.role == "student").all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "email": s.email,
+            "face_enrolled": s.face_enrolled,
+            "created_at": s.created_at
+        } for s in students
+    ]
+
+
+@router.get("/teacher/alerts")
+def list_recent_alerts_for_teacher(
+    page: int = 1,
+    size: int = 10,
+    exam_id: int = None,
+    student_id: int = None,
+    current_user: User = Depends(RoleChecker(["teacher"])),
+    db: Session = Depends(get_db)
+):
+    """Return recent proctoring warnings/violations across exams run by this instructor, with pagination and filters."""
+    teacher_exams = db.query(Exam).filter(Exam.teacher_id == current_user.id).all()
+    exam_ids = [e.id for e in teacher_exams]
+    
+    attempts_query = db.query(Attempt).filter(Attempt.exam_id.in_(exam_ids))
+    if exam_id:
+        attempts_query = attempts_query.filter(Attempt.exam_id == exam_id)
+    if student_id:
+        attempts_query = attempts_query.filter(Attempt.student_id == student_id)
+        
+    attempts = attempts_query.all()
+    attempt_map = {a.id: a for a in attempts}
+    attempt_ids = list(attempt_map.keys())
+
+    if not attempt_ids:
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "size": size,
+            "pages": 0
+        }
+
+    violations_query = db.query(Violation).filter(Violation.attempt_id.in_(attempt_ids))
+    total = violations_query.count()
+    
+    violations = violations_query.order_by(Violation.created_at.desc()).offset((page - 1) * size).limit(size).all()
+
+    alert_feed = []
+    for v in violations:
+        att = attempt_map.get(v.attempt_id)
+        student = db.query(User).filter(User.id == att.student_id).first() if att else None
+        exam = db.query(Exam).filter(Exam.id == att.exam_id).first() if att else None
+        alert_feed.append({
+            "id": v.id,
+            "violation_type": v.type,
+            "student_name": student.name if student else "Unknown Student",
+            "exam_title": exam.title if exam else "Unknown Exam",
+            "created_at": v.created_at
+        })
+        
+    return {
+        "items": alert_feed,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size if total > 0 else 0
+    }
+

@@ -39,10 +39,10 @@ export default function AnswerKey() {
 
     try {
       await client.post(`/exams/${examId}/answer-key`, payload);
-      setStatus('Answer key updated and auto-evaluation completed!');
+      setStatus('Corrections saved. Affected submissions have been re-evaluated.');
       setTimeout(() => navigate('/teacher/exams'), 1500);
     } catch {
-      setStatus('Failed to upload answer key.');
+      setStatus('Failed to save corrections.');
     } finally {
       setSaving(false);
     }

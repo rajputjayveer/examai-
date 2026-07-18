@@ -17,7 +17,7 @@ router = APIRouter()
 def send_otp_email(email: str, otp_code: str):
     send_email(
         email,
-        "Verify your ExamGuard AI account",
+        "Verify your SecureExam AI account",
         f"Your verification code is: {otp_code}\nExpires in 5 minutes."
     )
 
@@ -31,10 +31,28 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The user with this email already exists in the system.",
-        )
+        if not existing_user.is_verified:
+            # Generate OTP
+            otp_code = f"{random.randint(100000, 999999)}"
+            expires_at = datetime.utcnow() + timedelta(minutes=5)
+            otp_hash = get_password_hash(otp_code)
+            db_otp = OTPVerification(
+                user_id=existing_user.id,
+                otp_hash=otp_hash,
+                expires_at=expires_at
+            )
+            db.add(db_otp)
+            db.commit()
+            send_otp_email(existing_user.email, otp_code)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Email is unverified. OTP has been resent. Please verify.",
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The user with this email already exists in the system.",
+            )
     
     # Create user
     hashed_password = get_password_hash(user_in.password)
@@ -151,7 +169,7 @@ def create_teacher(
     
     send_email(
         db_user.email,
-        "Your ExamGuard AI Teacher Account Details",
+        "Your SecureExam AI Teacher Account Details",
         f"Hello {db_user.name},\n\nAn instructor account has been created for you.\n"
         f"Login Email: {db_user.email}\nTemporary Password: {temp_password}\n\n"
         f"You will be prompted to change this password on your first login."
@@ -201,7 +219,7 @@ def forgot_password(email: str, db: Session = Depends(get_db)):
         db.commit()
         send_email(
             user.email,
-            "Reset your ExamGuard AI Password",
+            "Reset your SecureExam AI Password",
             f"Your password reset verification code is: {otp_code}\nExpires in 10 minutes."
         )
     return {"detail": "If that email is registered, a reset code has been sent."}
