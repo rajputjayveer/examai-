@@ -11,10 +11,10 @@ export default function AdminPanel() {
   const [attemptsList, setAttemptsList] = useState([]);
   const [teacherName, setTeacherName] = useState('');
   const [teacherEmail, setTeacherEmail] = useState('');
-  const [teacherPassword, setTeacherPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
@@ -42,6 +42,7 @@ export default function AdminPanel() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
     const params = new URLSearchParams();
     params.append('username', username);
     params.append('password', password);
@@ -51,24 +52,29 @@ export default function AdminPanel() {
       });
       localStorage.setItem('token', res.data.access_token);
       setIsLoggedIn(true);
-    } catch {
-      setError('Invalid admin credentials. Check username and password.');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid admin credentials. Check username and password.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
     setError(''); setSuccess('');
+    setSubmitting(true);
     try {
       await client.post('/auth/admin/create-teacher',
-        { name: teacherName, email: teacherEmail, password: teacherPassword, role: 'teacher' },
+        { name: teacherName, email: teacherEmail, role: 'teacher' },
         authHeader()
       );
-      setSuccess('Teacher account created successfully!');
-      setTeacherName(''); setTeacherEmail(''); setTeacherPassword('');
+      setSuccess(`Teacher account for ${teacherName} created! Auto-generated login credentials emailed to ${teacherEmail}.`);
+      setTeacherName(''); setTeacherEmail('');
       fetchData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create teacher account.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -85,8 +91,11 @@ export default function AdminPanel() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('adminToken');
+    sessionStorage.clear();
     setIsLoggedIn(false);
+    window.location.href = '/';
   };
 
   const tabs = [
@@ -138,9 +147,9 @@ export default function AdminPanel() {
                 onChange={e => setPassword(e.target.value)} className="input"
                 placeholder="••••••••" />
             </div>
-            <button id="admin-login-btn" type="submit"
-              className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm transition shadow-sm">
-              Log In as Admin
+            <button id="admin-login-btn" type="submit" disabled={submitting}
+              className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {submitting ? 'Authenticating…' : 'Log In as Admin'}
             </button>
           </form>
         </div>
@@ -242,15 +251,12 @@ export default function AdminPanel() {
                         onChange={e => setTeacherEmail(e.target.value)}
                         className="input" placeholder="teacher@college.edu" />
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">Password</label>
-                      <input type="password" required value={teacherPassword}
-                        onChange={e => setTeacherPassword(e.target.value)}
-                        className="input" placeholder="••••••••" />
-                    </div>
-                    <button type="submit"
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow-sm">
-                      + Create Teacher Account
+                    <p className="text-[11px] text-slate-400 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      ℹ A secure temporary password will be auto-generated and emailed to the instructor.
+                    </p>
+                    <button type="submit" disabled={submitting}
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                      {submitting ? 'Creating Account…' : '+ Create Teacher Account'}
                     </button>
                   </form>
                 </div>

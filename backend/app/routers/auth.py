@@ -9,6 +9,7 @@ from app.core.deps import get_current_active_user, RoleChecker
 from app.db.base import get_db
 from app.models.user import User
 from app.models.otp import OTPVerification
+from app.models.pending_enrollment import PendingEnrollment
 from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
 from app.core.config import settings
 
@@ -28,8 +29,20 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Self-registration is only allowed for students.",
         )
+    # Ensure student can ONLY register if an instructor has added/invited their email into a class roster
+    user_email_clean = user_in.email.strip().lower()
+    pending_invite = db.query(PendingEnrollment).filter(
+        PendingEnrollment.email == user_email_clean
+    ).first()
+
+    if not pending_invite:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is restricted. You must be added to a class roster by an instructor before you can register an account."
+        )
+
     # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_in.email).first()
+    existing_user = db.query(User).filter(User.email == user_email_clean).first()
     if existing_user:
         if not existing_user.is_verified:
             # Generate OTP
@@ -139,24 +152,28 @@ def generate_temp_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+
 @router.post("/admin/create-teacher", response_model=UserResponse)
 def create_teacher(
     user_in: UserCreate,
     current_user: User = Depends(RoleChecker(["admin"])),
     db: Session = Depends(get_db)
 ):
-    existing_user = db.query(User).filter(User.email == user_in.email).first()
+    target_email = user_in.email.strip().lower()
+    existing_user = db.query(User).filter(func.lower(User.email) == target_email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already exists"
+            detail="A user account with this email address already exists."
         )
         
-    temp_password = generate_temp_password()
+    temp_password = user_in.password if user_in.password else generate_temp_password()
     hashed_password = get_password_hash(temp_password)
     db_user = User(
         name=user_in.name,
-        email=user_in.email,
+        email=target_email,
         password_hash=hashed_password,
         role="teacher",
         is_verified=True,
@@ -164,8 +181,15 @@ def create_teacher(
         must_change_password=True
     )
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    try:
+        db.commit()
+        db.refresh(db_user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user account with this email address already exists."
+        )
     
     send_email(
         db_user.email,

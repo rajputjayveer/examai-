@@ -70,6 +70,7 @@ function statusBadge(exam) {
 
 export default function StudentDashboard() {
   const [exams, setExams] = useState([]);
+  const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('exams');
   const { user } = useAuth();
@@ -79,6 +80,10 @@ export default function StudentDashboard() {
     client.get('/exams')
       .then(res => { setExams(res.data); setLoading(false); })
       .catch(() => setLoading(false));
+
+    client.get('/students/profile')
+      .then(res => setProfileData(res.data))
+      .catch(() => {});
   }, []);
 
   const liveExams     = exams.filter(e => { const now = new Date(); return now >= new Date(e.start_at) && now <= new Date(e.end_at) && !e.user_has_submitted; });
@@ -233,7 +238,7 @@ export default function StudentDashboard() {
         {/* Tab Content: Biometrics Profile */}
         {activeTab === 'biometrics' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-card max-w-2xl animate-fade-in space-y-6">
-            <h2 className="text-lg font-bold text-slate-900 font-display border-b border-slate-100 pb-3">Face ID Profile Details</h2>
+            <h2 className="text-lg font-bold text-slate-900 font-display border-b border-slate-100 pb-3">Student Profile & Biometrics</h2>
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="w-28 h-28 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0 text-slate-400 overflow-hidden">
                 {user?.face_enrolled ? (
@@ -247,8 +252,8 @@ export default function StudentDashboard() {
                 )}
               </div>
               <div className="space-y-1.5 text-center sm:text-left">
-                <h3 className="font-bold text-slate-800">{user?.name}</h3>
-                <p className="text-xs text-slate-500">Student Account</p>
+                <h3 className="font-bold text-slate-800 text-lg">{user?.name}</h3>
+                <p className="text-xs text-slate-500 font-mono">{user?.email}</p>
                 <div className="pt-2">
                   {user?.face_enrolled ? (
                     <span className="px-3 py-1 bg-emerald-50 border border-emerald-250 text-emerald-700 text-xs font-bold rounded-full">
@@ -261,6 +266,27 @@ export default function StudentDashboard() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* My Enrolled Classes Section */}
+            <div className="bg-brand-50/50 border border-brand-200/70 rounded-2xl p-5 space-y-3">
+              <h4 className="text-xs font-bold text-brand-800 uppercase tracking-wide flex items-center gap-2">
+                <span>🏫</span> My Enrolled Classes
+              </h4>
+              {profileData?.enrolled_classes?.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {profileData.enrolled_classes.map(cls => (
+                    <div key={cls.id} className="bg-white p-3 rounded-xl border border-brand-100 shadow-2xs">
+                      <p className="font-bold text-slate-900 text-xs">{cls.name}</p>
+                      {cls.description && <p className="text-[11px] text-slate-500 mt-0.5">{cls.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  You are not currently enrolled in any class rooms.
+                </p>
+              )}
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">

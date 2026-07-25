@@ -15,6 +15,8 @@ from app.schemas.attempt import AttemptResponse, AnswerCreate, AnswerResponse
 
 router = APIRouter()
 
+from app.models.enrollment import Enrollment
+
 @router.post("/start", response_model=AttemptResponse)
 def start_attempt(
     exam_id: int,
@@ -24,6 +26,15 @@ def start_attempt(
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+        
+    if exam.class_id is not None:
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.class_id == exam.class_id,
+            Enrollment.student_id == current_user.id,
+            Enrollment.status == "active"
+        ).first()
+        if not enrollment:
+            raise HTTPException(status_code=403, detail="You are not actively enrolled in the class for this exam.")
         
     # Check if ongoing attempt exists
     existing_attempt = db.query(Attempt).filter(

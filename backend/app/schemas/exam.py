@@ -26,6 +26,8 @@ class ExamBase(BaseModel):
     duration_minutes: int
     start_at: datetime
     end_at: datetime
+    class_id: Optional[int] = None
+    visibility: Optional[str] = "global"
 
 class ExamCreate(ExamBase):
     pass

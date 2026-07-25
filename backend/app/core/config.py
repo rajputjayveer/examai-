@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
 
 
 

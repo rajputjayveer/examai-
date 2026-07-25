@@ -1,19 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 import os
-
-from sqlalchemy.orm import Session
+import secrets
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.db.base import get_db
 from app.core.deps import get_current_active_user, RoleChecker
+from app.core.config import settings
 from app.models.user import User
+from app.models.class_room import ClassRoom
+from app.models.enrollment import Enrollment
 from app.models.exam import Exam
+from app.models.exam_access_token import ExamAccessToken
 from app.models.question import Question
 from app.models.attempt import Attempt
 from app.models.answer import Answer
 from app.schemas.exam import ExamCreate, ExamResponse, QuestionCreate, QuestionResponse, ExamDetailResponse
+from app.services.email_service import send_email
 
 router = APIRouter()
 
@@ -31,6 +37,22 @@ def download_question_template():
         filename="ExamGuardAI_Question_Import_Template.xlsx"
     )
 
+@router.get("/join/{token}")
+def join_exam_via_token(token: str, db: Session = Depends(get_db)):
+    """Validate exam access token and return target exam_id for frontend deep linking."""
+    token_entry = db.query(ExamAccessToken).filter(ExamAccessToken.token == token).first()
+    if not token_entry:
+        raise HTTPException(status_code=404, detail="Invalid exam access token.")
+    
+    if datetime.utcnow() > token_entry.expires_at:
+        raise HTTPException(status_code=400, detail="Exam access token has expired.")
+
+    return {
+        "exam_id": token_entry.exam_id,
+        "student_id": token_entry.student_id,
+        "valid": True
+    }
+
 @router.get("", response_model=List[ExamResponse])
 def list_exams(
     current_user: User = Depends(get_current_active_user),
@@ -39,9 +61,24 @@ def list_exams(
     if current_user.role == "teacher":
         return db.query(Exam).filter(Exam.teacher_id == current_user.id).all()
     else:
-        # Load published exams
-        exams = db.query(Exam).filter(Exam.status == "published").all()
-        # Find attempts for this user
+        # Student view: return GLOBAL published exams UNION exams of active enrolled classes
+        active_class_ids = [
+            enr.class_id for enr in db.query(Enrollment).filter(
+                Enrollment.student_id == current_user.id,
+                Enrollment.status == "active"
+            ).all()
+        ]
+
+        query = db.query(Exam).filter(Exam.status == "published")
+        if active_class_ids:
+            query = query.filter(
+                (Exam.class_id.is_(None)) | (Exam.class_id.in_(active_class_ids))
+            )
+        else:
+            query = query.filter(Exam.class_id.is_(None))
+
+        exams = query.all()
+
         user_attempts = db.query(Attempt).filter(Attempt.student_id == current_user.id).all()
         attempt_map = {att.exam_id: att.status for att in user_attempts}
         attempt_id_map = {att.exam_id: att.id for att in user_attempts}
@@ -51,13 +88,13 @@ def list_exams(
         for e in exams:
             status_val = attempt_map.get(e.id)
             has_submitted = status_val in ["submitted", "graded"]
-            
-            # Count questions to know total marks possible
             total_questions = db.query(Question).filter(Question.exam_id == e.id).count()
 
             response_data.append({
                 "id": e.id,
                 "teacher_id": e.teacher_id,
+                "class_id": e.class_id,
+                "visibility": e.visibility or ("class" if e.class_id else "global"),
                 "title": e.title,
                 "duration_minutes": e.duration_minutes,
                 "start_at": e.start_at,
@@ -77,8 +114,17 @@ def create_exam(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: Session = Depends(get_db)
 ):
+    if exam_in.class_id:
+        class_room = db.query(ClassRoom).filter(ClassRoom.id == exam_in.class_id, ClassRoom.teacher_id == current_user.id).first()
+        if not class_room:
+            raise HTTPException(status_code=400, detail="Invalid class_id or you do not own this class.")
+
+    visibility_val = "class" if exam_in.class_id else "global"
+
     exam = Exam(
         teacher_id=current_user.id,
+        class_id=exam_in.class_id,
+        visibility=visibility_val,
         title=exam_in.title,
         duration_minutes=exam_in.duration_minutes,
         start_at=exam_in.start_at,
@@ -113,7 +159,14 @@ def update_exam(
         raise HTTPException(status_code=404, detail="Exam not found")
     if exam.status == "published":
         raise HTTPException(status_code=400, detail="Cannot edit a published exam")
-        
+
+    if exam_in.class_id:
+        class_room = db.query(ClassRoom).filter(ClassRoom.id == exam_in.class_id, ClassRoom.teacher_id == current_user.id).first()
+        if not class_room:
+            raise HTTPException(status_code=400, detail="Invalid class_id or you do not own this class.")
+
+    exam.class_id = exam_in.class_id
+    exam.visibility = "class" if exam_in.class_id else "global"
     exam.title = exam_in.title
     exam.duration_minutes = exam_in.duration_minutes
     exam.start_at = exam_in.start_at
@@ -131,9 +184,56 @@ def publish_exam(
     exam = db.query(Exam).filter(Exam.id == exam_id, Exam.teacher_id == current_user.id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
+        
     exam.status = "published"
     db.commit()
     db.refresh(exam)
+
+    # Determine recipient student users:
+    # If class_id is set: actively enrolled students of that class
+    # If null (global): all actively enrolled students in ANY class owned by this teacher
+    if exam.class_id:
+        active_enrollments = db.query(Enrollment).filter(
+            Enrollment.class_id == exam.class_id,
+            Enrollment.status == "active"
+        ).all()
+        student_ids = list(set([enr.student_id for enr in active_enrollments]))
+    else:
+        teacher_class_ids = [c.id for c in db.query(ClassRoom).filter(ClassRoom.teacher_id == current_user.id).all()]
+        if teacher_class_ids:
+            active_enrollments = db.query(Enrollment).filter(
+                Enrollment.class_id.in_(teacher_class_ids),
+                Enrollment.status == "active"
+            ).all()
+            student_ids = list(set([enr.student_id for enr in active_enrollments]))
+        else:
+            student_ids = []
+
+    recipients = db.query(User).filter(User.id.in_(student_ids)).all() if student_ids else []
+
+    # Expiration: min(exam.end_at, now + 7 days)
+    now = datetime.utcnow()
+    seven_days = now + timedelta(days=7)
+    expires_at = exam.end_at if exam.end_at < seven_days else seven_days
+
+    for student in recipients:
+        raw_token = secrets.token_urlsafe(32)
+        access_token = ExamAccessToken(
+            exam_id=exam.id,
+            student_id=student.id,
+            token=raw_token,
+            expires_at=expires_at
+        )
+        db.add(access_token)
+
+        join_link = f"{settings.FRONTEND_BASE_URL}/join-exam?token={raw_token}"
+        send_email(
+            student.email,
+            f"New exam: {exam.title}",
+            f"Hello {student.name},\n\nA new exam '{exam.title}' has been published by your instructor {current_user.name}.\n\nAccess link: {join_link}\n\nNote: You will be required to log in and complete face verification to enter."
+        )
+
+    db.commit()
     return exam
 
 @router.post("/{exam_id}/questions", response_model=List[QuestionResponse])
@@ -147,7 +247,6 @@ def add_questions(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
         
-    # Delete existing questions first to overwrite
     db.query(Question).filter(Question.exam_id == exam_id).delete()
     db.commit()
 
@@ -177,21 +276,14 @@ def get_questions(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Return questions for an exam — used by the AnswerKey builder UI."""
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     return db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order_index).all()
 
-
-class AnswerKeyItem(BaseModel if False else object):
-    pass
-
-from pydantic import BaseModel
-
 class AnswerKeyEntry(BaseModel):
     question_id: int
-    correct_option: str  # 'A', 'B', 'C', or 'D'
+    correct_option: str
 
 @router.post("/{exam_id}/answer-key")
 def review_and_correct_answers(
@@ -200,12 +292,6 @@ def review_and_correct_answers(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: Session = Depends(get_db)
 ):
-    """
-    The answer key is already set at question creation time, so this endpoint
-    is now a CORRECTION tool only — use it to void a disputed question
-    (correct_option=None) or fix a typo'd key, then it re-evaluates any
-    attempts already scored so nothing goes stale.
-    """
     exam = db.query(Exam).filter(Exam.id == exam_id, Exam.teacher_id == current_user.id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
@@ -237,7 +323,6 @@ def review_and_correct_answers(
 
     return {"detail": "Corrections applied and affected attempts re-evaluated."}
 
-
 @router.post("/upload-pdf")
 def upload_pdf_exam(
     file: UploadFile = File(...),
@@ -248,7 +333,6 @@ def upload_pdf_exam(
     import os
     from app.services.pdf_parser_service import parse_pdf_questions
 
-    # Save to a temporary file
     suffix = os.path.splitext(file.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         temp_file.write(file.file.read())
@@ -263,19 +347,12 @@ def upload_pdf_exam(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-
 @router.post("/upload-sheet")
 def upload_sheet_exam(
     file: UploadFile = File(...),
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: Session = Depends(get_db)
 ):
-    """Parse questions from a CSV or Excel file.
-
-    Required columns: question, option_a, option_b, option_c, option_d, correct_option
-    Returns the same {questions: [...]} shape as /upload-pdf so the frontend
-    can feed both into the same review-before-save step.
-    """
     import tempfile
     import os
     from app.services.csv_parser_service import parse_csv_questions

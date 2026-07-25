@@ -84,10 +84,9 @@ export default function VerifyOtp() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-slate-900 mb-1">Check your email</h2>
-          <p className="text-sm text-slate-500 mb-2">
+          <p className="text-sm text-slate-500 mb-8">
             We sent a 6-digit code to <span className="font-semibold text-slate-700">{email}</span>
           </p>
-          <p className="text-xs text-slate-400 mb-8">(Check the server console if DEV_MODE is on)</p>
 
           {success && (
             <div className="mb-6 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700 font-medium">

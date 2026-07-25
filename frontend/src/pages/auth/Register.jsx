@@ -19,13 +19,12 @@ export default function Register() {
       // Redirect to OTP verification page
       navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err) {
-      if (err.response?.status === 403) {
-        setError(err.response.data.detail + ' Redirecting to verification page...');
+      const detail = err.response?.data?.detail || 'Registration failed. Please try again.';
+      setError(detail);
+      if (err.response?.status === 403 && detail.includes('OTP has been resent')) {
         setTimeout(() => {
           navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
         }, 2000);
-      } else {
-        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);

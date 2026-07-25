@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import ClassManagement from './ClassManagement';
+import StudentProfileModal from './StudentProfileModal';
 
 function Sidebar({ activeTab, setActiveTab }) {
   const { logout, user } = useAuth();
   
   const tabs = [
     { id: 'exams', label: 'Exams Workspace', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
+    { id: 'classes', label: 'My Classes', icon: 'M4.26 10.147a60.436 60.436 0 01-.491-6.347A48.627 48.627 0 0112 3c4.248 0 8.312.545 12.163 1.571a60.465 60.465 0 01-.491 6.347m-15.482 0a50.57 50.57 0 00-2.658 8.14A59.905 59.905 0 0112 19c4.248 0 8.312-.545 12.163-1.571a50.55 50.55 0 00-2.658-8.14' },
     { id: 'students', label: 'Student Directory', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.978 11.978 0 0112 20.25a11.978 11.978 0 01-3-.109v-.111c0-1.113.285-2.16.786-3.07M12 20.25a8.974 8.974 0 002.223-5.843M12 20.25a8.974 8.974 0 01-2.223-5.843m0 0a8.968 8.968 0 00-1.75-5.54M9 14.377a8.968 8.968 0 01-1.75-5.54M12 14.407a8.977 8.977 0 01-2.223-5.843M12 14.407a8.977 8.977 0 002.223-5.843M12 8.564a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z' },
     { id: 'alerts', label: 'Live Warnings Feed', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
   ];
@@ -70,6 +73,7 @@ export default function ExamList() {
   const [selectedStudent, setSelectedStudent] = useState('');
   const [alertPage, setAlertPage] = useState(1);
   const [alertMeta, setAlertMeta] = useState({ total: 0, pages: 0 });
+  const [inspectStudentId, setInspectStudentId] = useState(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -233,7 +237,10 @@ export default function ExamList() {
               </div>
             )}
 
-            {/* Tab 2: Student Directory */}
+            {/* Tab 2: My Classes */}
+            {activeTab === 'classes' && <ClassManagement />}
+
+            {/* Tab 3: Student Directory */}
             {activeTab === 'students' && (
               <div className="space-y-6">
                 <h2 className="text-base font-bold text-slate-900 mb-4 font-display">Student Roster</h2>
@@ -256,7 +263,14 @@ export default function ExamList() {
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                           {students.map(std => (
                             <tr key={std.id} className="hover:bg-slate-50/50 transition">
-                              <td className="px-6 py-4 font-bold text-slate-900">{std.name}</td>
+                              <td className="px-6 py-4 font-bold text-slate-900">
+                                <button
+                                  onClick={() => setInspectStudentId(std.id)}
+                                  className="text-brand-600 hover:underline font-bold text-left"
+                                >
+                                  {std.name}
+                                </button>
+                              </td>
                               <td className="px-6 py-4">{std.email}</td>
                               <td className="px-6 py-4">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold border ${
@@ -384,6 +398,13 @@ export default function ExamList() {
           </div>
         )}
       </main>
+
+      {inspectStudentId && (
+        <StudentProfileModal
+          studentId={inspectStudentId}
+          onClose={() => setInspectStudentId(null)}
+        />
+      )}
     </div>
   );
 }

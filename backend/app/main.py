@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from app.db.init_db import init_db
-from app.routers import auth, students, exams, attempts, proctoring, reports, admin
+from app.routers import auth, students, exams, attempts, proctoring, reports, admin, classes
 
 # Create tables
 init_db()
@@ -33,6 +33,7 @@ app.mount("/api/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin Operations"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
+app.include_router(classes.router, prefix="/api/classes", tags=["Classes"])
 app.include_router(exams.router, prefix="/api/exams", tags=["Exams"])
 app.include_router(attempts.router, prefix="/api/attempts", tags=["Attempts"])
 app.include_router(proctoring.router, prefix="/api/proctoring", tags=["Proctoring"])

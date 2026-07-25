@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
+  const [searchParams] = useSearchParams();
+  const [roleTab, setRoleTab] = useState('student'); // 'student', 'teacher', 'admin'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,13 +17,33 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
+
+      // Verify returned role against selected role tab (warn if mismatched)
+      if (user && user.role !== roleTab && !(roleTab === 'admin' && user.role === 'admin')) {
+        console.warn(`User role '${user.role}' logged in under '${roleTab}' tab.`);
+      }
+
+      const nextParam = searchParams.get('next');
+      const pendingNextUrl = sessionStorage.getItem('pendingNextUrl');
       const pendingExam = sessionStorage.getItem('pendingExamJoin');
-      if (pendingExam) {
-        sessionStorage.removeItem('pendingExamJoin');
-        navigate(`/student/instructions/${pendingExam}`);
+
+      if (user?.role === 'admin') {
+        navigate('/admin');
+      } else if (user?.role === 'teacher') {
+        navigate('/teacher/exams');
       } else {
-        navigate('/');
+        if (nextParam) {
+          navigate(nextParam);
+        } else if (pendingNextUrl) {
+          sessionStorage.removeItem('pendingNextUrl');
+          navigate(pendingNextUrl);
+        } else if (pendingExam) {
+          sessionStorage.removeItem('pendingExamJoin');
+          navigate(`/student/instructions/${pendingExam}`);
+        } else {
+          navigate('/student/dashboard');
+        }
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
@@ -30,8 +52,31 @@ export default function Login() {
     }
   };
 
+  const roleConfigs = {
+    student: {
+      title: 'Student Portal Login',
+      subtitle: 'Sign in to access your assigned proctored exams',
+      placeholderEmail: 'student@example.com',
+      badgeColor: 'bg-brand-50 text-brand-700 border-brand-200'
+    },
+    teacher: {
+      title: 'Instructor Portal Login',
+      subtitle: 'Sign in to manage classes, exams, and student analytics',
+      placeholderEmail: 'teacher@college.edu',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    },
+    admin: {
+      title: 'Admin Console Login',
+      subtitle: 'Sign in to manage teachers, users, and platform settings',
+      placeholderEmail: 'admin@secureexam.ai',
+      badgeColor: 'bg-slate-100 text-slate-800 border-slate-300'
+    }
+  };
+
+  const currentConfig = roleConfigs[roleTab];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-slate-100 flex items-center justify-center px-4 py-8">
       {/* Decorative blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand-200 opacity-30 rounded-full blur-3xl" />
@@ -40,22 +85,62 @@ export default function Login() {
 
       <div className="relative w-full max-w-md animate-slide-up">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-600 rounded-2xl shadow-lg mb-4">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-600 rounded-2xl shadow-lg mb-3">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 font-display">SecureExam <span className="text-brand-600">AI</span></h1>
-          <p className="mt-1 text-sm text-slate-500">Secure AI-Powered Proctoring Platform</p>
+          <p className="mt-1 text-xs text-slate-500 font-medium">Unified Authentication Portal</p>
+        </div>
+
+        {/* Role Selector Tabs */}
+        <div className="grid grid-cols-3 gap-1 bg-slate-200/80 p-1.5 rounded-2xl mb-6 shadow-inner">
+          <button
+            type="button"
+            onClick={() => { setRoleTab('student'); setError(''); }}
+            className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              roleTab === 'student'
+                ? 'bg-white text-brand-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🎓</span> Student
+          </button>
+          <button
+            type="button"
+            onClick={() => { setRoleTab('teacher'); setError(''); }}
+            className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              roleTab === 'teacher'
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>👨‍🏫</span> Teacher
+          </button>
+          <button
+            type="button"
+            onClick={() => { setRoleTab('admin'); setError(''); }}
+            className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              roleTab === 'admin'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🛡️</span> Admin
+          </button>
         </div>
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-card border border-slate-200 p-8">
-          <h2 className="text-xl font-semibold text-slate-800 mb-6">Sign in to your account</h2>
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-slate-900 font-display">{currentConfig.title}</h2>
+            <p className="text-xs text-slate-500 mt-1">{currentConfig.subtitle}</p>
+          </div>
 
           {error && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-200 p-3.5 text-sm text-red-700">
+            <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs font-semibold text-red-700">
               <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
@@ -65,21 +150,21 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address</label>
               <input
                 id="login-email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
-                placeholder="you@example.com"
+                className="input text-xs"
+                placeholder={currentConfig.placeholderEmail}
               />
             </div>
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-sm font-medium text-slate-700">Password</label>
+                <label className="block text-xs font-bold text-slate-700">Password</label>
                 <Link to="/forgot-password" className="text-xs font-semibold text-brand-600 hover:text-brand-700">
                   Forgot password?
                 </Link>
@@ -90,7 +175,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="input text-xs"
                 placeholder="••••••••"
               />
             </div>
@@ -99,7 +184,7 @@ export default function Login() {
               id="login-submit"
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition-all duration-150 shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition-all duration-150 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -109,22 +194,31 @@ export default function Login() {
                   </svg>
                   Signing in…
                 </>
-              ) : 'Sign In'}
+              ) : `Sign In as ${roleTab.charAt(0).toUpperCase() + roleTab.slice(1)}`}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            New student?{' '}
-            <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700">
-              Create an account
-            </Link>
-          </p>
-        </div>
+          {roleTab === 'student' && (
+            <p className="mt-6 text-center text-xs text-slate-500">
+              New student?{' '}
+              <Link to="/register" className="font-bold text-brand-600 hover:text-brand-700">
+                Create an account
+              </Link>
+            </p>
+          )}
 
-        {/* Teacher hint */}
-        <p className="mt-4 text-center text-xs text-slate-400">
-          Teachers are added by your administrator. Contact admin for access.
-        </p>
+          {roleTab === 'teacher' && (
+            <p className="mt-6 text-center text-xs text-slate-400">
+              Teacher accounts are created by your administrator. Contact your admin for access credentials.
+            </p>
+          )}
+
+          {roleTab === 'admin' && (
+            <p className="mt-6 text-center text-xs text-slate-400">
+              Admin console access for platform administrators.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

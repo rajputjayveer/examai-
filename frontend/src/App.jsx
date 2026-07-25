@@ -20,6 +20,7 @@ import CameraCheck from './pages/student/CameraCheck';
 import Instructions from './pages/student/Instructions';
 import ExamRoom from './pages/student/ExamRoom';
 import StudentResult from './pages/student/Result';
+import JoinExam from './pages/student/JoinExam';
 
 // Teacher pages
 import TeacherExamList from './pages/teacher/ExamList';
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/join-exam"      element={<JoinExam />} />
 
           {/* ── Admin (has its own internal login screen) ── */}
           <Route path="/admin" element={<AdminPanel />} />
@@ -130,6 +132,8 @@ export default function App() {
           <Route path="/teacher/exam/:examId/results"
             element={<ProtectedRoute allowedRoles={['teacher']}><ResultsDashboard /></ProtectedRoute>} />
           <Route path="/teacher/exam/:examId/analytics"
+            element={<ProtectedRoute allowedRoles={['teacher']}><ClassAnalytics /></ProtectedRoute>} />
+          <Route path="/teacher/class/:classId/analytics"
             element={<ProtectedRoute allowedRoles={['teacher']}><ClassAnalytics /></ProtectedRoute>} />
           <Route path="/teacher/report/:attemptId"
             element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><StudentReport /></ProtectedRoute>} />

@@ -8,6 +8,8 @@ export default function CreateExam() {
   const [duration, setDuration] = useState(60);
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
+  const [classId, setClassId] = useState('');
+  const [classList, setClassList] = useState([]);
   
   const [questions, setQuestions] = useState([]);
   const [qText, setQText] = useState('');
@@ -24,6 +26,10 @@ export default function CreateExam() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    client.get('/classes')
+      .then(res => setClassList(res.data))
+      .catch(() => {});
+
     if (!examId) return;
     const fetchExam = async () => {
       try {
@@ -34,6 +40,7 @@ export default function CreateExam() {
         const exam = examRes.data;
         setTitle(exam.title);
         setDuration(exam.duration_minutes);
+        setClassId(exam.class_id ? String(exam.class_id) : '');
         
         const formatLocal = (dtStr) => {
           if (!dtStr) return '';
@@ -159,21 +166,19 @@ export default function CreateExam() {
     }
 
     try {
+      const payload = {
+        title,
+        duration_minutes: parseInt(duration),
+        start_at: startAt,
+        end_at: endAt,
+        class_id: classId ? parseInt(classId) : null
+      };
+
       let targetExamId = examId;
       if (examId) {
-        await client.put(`/exams/${examId}`, {
-          title,
-          duration_minutes: parseInt(duration),
-          start_at: startAt,
-          end_at: endAt
-        });
+        await client.put(`/exams/${examId}`, payload);
       } else {
-        const examRes = await client.post('/exams', {
-          title,
-          duration_minutes: parseInt(duration),
-          start_at: startAt, // sends local datetime string directly
-          end_at: endAt      // sends local datetime string directly
-        });
+        const examRes = await client.post('/exams', payload);
         targetExamId = examRes.data.id;
       }
       
@@ -238,6 +243,15 @@ export default function CreateExam() {
               <label className="block text-xs font-semibold text-slate-700 mb-1">Exam Title</label>
               <input type="text" required value={title} onChange={e => setTitle(e.target.value)} placeholder="Final Theory Assessment" className="input" />
             </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Class Assignment</label>
+              <select value={classId} onChange={e => setClassId(e.target.value)} className="input bg-white">
+                <option value="">🌐 Global (Visible to All Enrolled Students)</option>
+                {classList.map(c => (
+                  <option key={c.id} value={c.id}>🏫 {c.name} ({c.student_count} enrolled)</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Duration (Minutes)</label>
               <input type="number" required value={duration} onChange={e => handleDurationChange(e.target.value)} className="input" />
@@ -246,7 +260,7 @@ export default function CreateExam() {
               <label className="block text-xs font-semibold text-slate-700 mb-1">Start Time</label>
               <input type="datetime-local" required value={startAt} onChange={e => handleStartAtChange(e.target.value)} className="input" />
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">End Time</label>
               <input type="datetime-local" required value={endAt} onChange={e => setEndAt(e.target.value)} className="input" />
             </div>

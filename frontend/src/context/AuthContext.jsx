@@ -12,9 +12,11 @@ export const AuthProvider = ({ children }) => {
       // /auth/me works for student, teacher, and admin — no role-specific endpoint
       const response = await client.get('/auth/me');
       setUser(response.data);
-    } catch {
+      return response.data;
+    } catch (err) {
       localStorage.removeItem('token');
       setUser(null);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -37,12 +39,15 @@ export const AuthProvider = ({ children }) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     localStorage.setItem('token', response.data.access_token);
-    await fetchProfile();
+    return await fetchProfile();
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('adminToken');
+    sessionStorage.clear();
     setUser(null);
+    window.location.href = '/';
   };
 
   return (
