@@ -117,21 +117,23 @@ export default function StudentDashboard() {
         {activeTab === 'exams' && (
           <div className="space-y-8 animate-fade-in">
             {/* Stats row */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Overview Stats row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Live Now',  value: liveExams.length,     color: 'text-emerald-600', bg: 'bg-emerald-50', icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z' },
-                { label: 'Upcoming',  value: upcomingExams.length, color: 'text-blue-600',    bg: 'bg-blue-50',    icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5' },
-                { label: 'Completed', value: completedExams.length, color: 'text-slate-600',  bg: 'bg-slate-100',  icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { label: 'Live Exams',      value: liveExams.length,                                color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100', icon: 'M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z' },
+                { label: 'Upcoming',        value: upcomingExams.length,                            color: 'text-blue-600',    bg: 'bg-blue-50 border-blue-100',       icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5' },
+                { label: 'Completed',       value: completedExams.length,                           color: 'text-purple-600',  bg: 'bg-purple-50 border-purple-100',   icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { label: 'Enrolled Classes',value: profileData?.enrolled_classes?.length || 0,     color: 'text-brand-600',   bg: 'bg-brand-50 border-brand-100',     icon: 'M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342' },
               ].map(s => (
-                <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-card flex items-center gap-4">
-                  <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-card hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-4">
+                  <div className={`w-11 h-11 ${s.bg} rounded-xl border flex items-center justify-center flex-shrink-0 shadow-2xs`}>
                     <svg className={`w-5 h-5 ${s.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                       <path strokeLinecap="round" strokeLinejoin="round" d={s.icon} />
                     </svg>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-slate-900 font-display">{s.value}</p>
-                    <p className="text-xs text-slate-500">{s.label}</p>
+                    <p className="text-2xl font-extrabold text-slate-900 font-display">{s.value}</p>
+                    <p className="text-xs font-semibold text-slate-500">{s.label}</p>
                   </div>
                 </div>
               ))}
