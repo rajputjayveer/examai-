@@ -103,8 +103,9 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/join-exam"      element={<JoinExam />} />
 
-          {/* ── Admin (has its own internal login screen) ── */}
-          <Route path="/admin" element={<AdminPanel />} />
+          {/* ── Admin ── */}
+          <Route path="/admin"
+            element={<ProtectedRoute allowedRoles={['admin']}><AdminPanel /></ProtectedRoute>} />
 
           {/* ── Student ── */}
           <Route path="/enroll-face"

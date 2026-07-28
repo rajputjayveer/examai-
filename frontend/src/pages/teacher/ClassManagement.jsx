@@ -525,7 +525,7 @@ export default function ClassManagement() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <button
-                              onClick={() => handleRemoveStudent(std.id)}
+                              onClick={() => handleRemoveStudent(isPending ? std.id : std.student_id)}
                               className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 font-bold border border-red-200 transition"
                             >
                               {isPending ? 'Cancel' : 'Remove'}

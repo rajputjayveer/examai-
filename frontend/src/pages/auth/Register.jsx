@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import client from '../../api/client';
 
 export default function Register() {
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
