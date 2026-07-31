@@ -51,7 +51,12 @@ function Spinner() {
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) {
+    if (allowedRoles && allowedRoles.includes('admin')) {
+      return <Navigate to="/login?role=admin&next=/admin" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
 
   // Force password change on first login
@@ -95,17 +100,19 @@ export default function App() {
           <Route path="/" element={<RootRoute />} />
 
           {/* ── Auth ── */}
-          <Route path="/login"      element={<Login />} />
-          <Route path="/register"   element={<Register />} />
-          <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/login"       element={<Login />} />
+          <Route path="/admin/login" element={<Login />} />
+          <Route path="/register"    element={<Register />} />
+          <Route path="/verify-otp"  element={<VerifyOtp />} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/join-exam"      element={<JoinExam />} />
+          <Route path="/reset-password"  element={<ResetPassword />} />
+          <Route path="/join-exam"       element={<JoinExam />} />
 
           {/* ── Admin ── */}
           <Route path="/admin"
             element={<ProtectedRoute allowedRoles={['admin']}><AdminPanel /></ProtectedRoute>} />
+
 
           {/* ── Student ── */}
           <Route path="/enroll-face"

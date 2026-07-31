@@ -88,7 +88,10 @@ export default function Instructions() {
     }
   };
 
+  const [startingAttempt, setStartingAttempt] = useState(false);
+
   const handleStart = async () => {
+    setStartingAttempt(true);
     const cachedAttemptId = sessionStorage.getItem(`exam_attempt_${examId}`);
     if (cachedAttemptId) {
       sessionStorage.removeItem(`exam_attempt_${examId}`);
@@ -99,9 +102,11 @@ export default function Instructions() {
         navigate(`/student/exam/${res.data.id}`);
       } catch {
         setStatusMsg('Failed to join exam. Already submitted or closed.');
+        setStartingAttempt(false);
       }
     }
   };
+
 
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -195,10 +200,14 @@ export default function Instructions() {
               <button
                 id="enter-exam-btn"
                 onClick={handleStart}
-                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition shadow-sm"
+                disabled={startingAttempt}
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                🚀 Enter Exam Room
+                {startingAttempt ? (
+                  <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg> Entering Exam…</>
+                ) : '🚀 Enter Exam Room'}
               </button>
+
             )}
           </div>
         </div>

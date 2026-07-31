@@ -4,13 +4,15 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
   const [searchParams] = useSearchParams();
-  const [roleTab, setRoleTab] = useState('student'); // 'student', 'teacher', 'admin'
+  const initialRole = searchParams.get('role') || (window.location.pathname.includes('/admin') ? 'admin' : 'student');
+  const [roleTab, setRoleTab] = useState(initialRole); // 'student', 'teacher', 'admin'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();

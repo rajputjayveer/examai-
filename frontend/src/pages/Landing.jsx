@@ -63,7 +63,7 @@ export default function Landing() {
                 Complete pre-exam hardware diagnostic checks, verify your biometrics securely, and write tests with non-intrusive AI supervision.
               </p>
             </div>
-            <Link to="/login" className="w-full text-center py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-sm transition">
+            <Link to="/login?role=student" className="w-full text-center py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-sm transition">
               Enter Student Portal →
             </Link>
           </div>
@@ -81,7 +81,7 @@ export default function Landing() {
                 Generate exam papers instantly via AI-powered PDF extraction, configure questions, analyze student violations, and check class analytics.
               </p>
             </div>
-            <Link to="/login" className="w-full text-center py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-sm transition">
+            <Link to="/login?role=teacher" className="w-full text-center py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-sm transition">
               Enter Instructor Portal →
             </Link>
           </div>
@@ -95,7 +95,7 @@ export default function Landing() {
               { num: '01', title: 'Enroll & Verify', desc: 'Students register and quickly enroll their face to establish reference biometrics.' },
               { num: '02', title: 'Take Proctored Test', desc: 'Securely write exams inside a guarded browser window featuring face, audio, and focus tracking.' },
               { num: '03', title: 'Get Smart Reports', desc: 'Instant auto-evaluation and comprehensive proctoring reports detailing any classroom violations.' }
-            ].map((step, idx) => (
+            ].map((step) => (
               <div key={step.num} className="relative flex flex-col items-center text-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center text-brand-700 font-black text-lg">
                   {step.num}
@@ -131,7 +131,7 @@ export default function Landing() {
       <footer className="w-full bg-white border-t border-slate-200 py-6 text-center z-10">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-slate-400">© 2026 SecureExam AI. All rights reserved.</p>
-          <Link to="/admin" className="text-xs text-slate-400 hover:text-slate-600 hover:underline transition">
+          <Link to="/login?role=admin" className="text-xs text-slate-400 hover:text-slate-600 hover:underline transition">
             Administrator Access Console
           </Link>
         </div>

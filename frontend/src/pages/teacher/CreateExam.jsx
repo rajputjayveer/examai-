@@ -158,12 +158,17 @@ export default function CreateExam() {
     setEditingIdx(idx);
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (questions.length === 0) {
       setError('Please add at least one question to the exam.');
       return;
     }
+
+    setSubmitting(true);
+    setError('');
 
     try {
       const payload = {
@@ -186,8 +191,11 @@ export default function CreateExam() {
       navigate('/teacher/exams');
     } catch (err) {
       setError('Failed to save exam. Please check input values.');
+    } finally {
+      setSubmitting(false);
     }
   };
+
 
   const handleFileUpload = async (e, endpoint, setLoader) => {
     const file = e.target.files[0];
@@ -384,9 +392,15 @@ export default function CreateExam() {
             </div>
           </div>
 
-          <button type="submit" className="w-full btn-primary py-3">
-            {examId ? 'Save Changes' : 'Create Exam & Save Questions'}
+          <button type="submit" disabled={submitting} className="w-full btn-primary py-3 disabled:opacity-50 inline-flex items-center justify-center gap-2">
+            {submitting ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                Saving Exam…
+              </>
+            ) : (examId ? 'Save Changes' : 'Create Exam & Save Questions')}
           </button>
+
         </form>
       </div>
     </div>

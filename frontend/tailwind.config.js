@@ -18,6 +18,7 @@ export default {
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
+          950: '#172554',
         },
       },
       fontFamily: {
@@ -25,10 +26,14 @@ export default {
         display: ['Outfit', 'sans-serif'],
       },
       boxShadow: {
-        card:   '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 12px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)',
+        card:   '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)',
+        'card-hover': '0 8px 24px rgba(37,99,235,0.08), 0 4px 16px rgba(0,0,0,0.04)',
+        glow: '0 0 20px rgba(37,99,235,0.18)',
+        'glow-emerald': '0 0 20px rgba(16,185,129,0.18)',
+        'glow-rose': '0 0 20px rgba(244,63,94,0.18)',
       },
     },
   },
   plugins: [],
 }
+

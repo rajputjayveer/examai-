@@ -14,6 +14,7 @@ export default function AdminPanel() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState(null);
 
   // Filters for Exam Results
   const [selectedExamFilter, setSelectedExamFilter] = useState('All');
@@ -54,7 +55,7 @@ export default function AdminPanel() {
       );
       setSuccess(`Teacher account for ${teacherName} created! Auto-generated login credentials emailed to ${teacherEmail}.`);
       setTeacherName(''); setTeacherEmail('');
-      fetchData();
+      await fetchData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create teacher account.');
     } finally {
@@ -65,14 +66,18 @@ export default function AdminPanel() {
   const handleDelete = async (userId) => {
     if (!window.confirm('Delete this user? This action cannot be undone.')) return;
     setError(''); setSuccess('');
+    setDeletingUserId(userId);
     try {
       await client.delete(`/admin/users/${userId}`, authHeader());
       setSuccess('User deleted successfully.');
-      fetchData();
+      await fetchData();
     } catch {
       setError('Failed to delete user.');
+    } finally {
+      setDeletingUserId(null);
     }
   };
+
 
   const uniqueExams = Array.from(new Set(attemptsList.map(a => a.exam_title))).filter(Boolean);
 
@@ -258,8 +263,14 @@ export default function AdminPanel() {
                             <td className="px-6 py-4 text-slate-600 text-xs font-mono">{t.email}</td>
                             <td className="px-6 py-4 text-right">
                               <button onClick={() => handleDelete(t.id)}
-                                className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 font-bold border border-red-200 text-xs transition">
-                                Remove
+                                disabled={deletingUserId === t.id}
+                                className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold border border-red-200 text-xs transition disabled:opacity-50 inline-flex items-center gap-1.5">
+                                {deletingUserId === t.id ? (
+                                  <>
+                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                                    Removing…
+                                  </>
+                                ) : 'Remove'}
                               </button>
                             </td>
                           </tr>
@@ -304,10 +315,17 @@ export default function AdminPanel() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <button onClick={() => handleDelete(u.id)}
-                              className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 font-bold border border-red-200 text-xs transition">
-                              Delete
+                              disabled={deletingUserId === u.id}
+                              className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold border border-red-200 text-xs transition disabled:opacity-50 inline-flex items-center gap-1.5">
+                              {deletingUserId === u.id ? (
+                                <>
+                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                                  Deleting…
+                                </>
+                              ) : 'Delete'}
                             </button>
                           </td>
+
                         </tr>
                       ))}
                     </tbody>

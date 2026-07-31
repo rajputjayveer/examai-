@@ -61,7 +61,10 @@ export default function StudentReport() {
       .catch(() => setLoading(false));
   }, [attemptId]);
 
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
   const downloadPdf = async () => {
+    setDownloadingPdf(true);
     try {
       const response = await client.get(`/reports/${attemptId}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -73,6 +76,8 @@ export default function StudentReport() {
       link.remove();
     } catch {
       alert('Failed to download PDF report.');
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -113,9 +118,15 @@ export default function StudentReport() {
             </p>
           </div>
           <div className="flex gap-3">
-            <button onClick={downloadPdf} className="btn-primary py-2 px-4 text-xs">
-              📥 Download PDF
+            <button onClick={downloadPdf} disabled={downloadingPdf} className="btn-primary py-2 px-4 text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
+              {downloadingPdf ? (
+                <>
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                  Downloading…
+                </>
+              ) : '📥 Download PDF'}
             </button>
+
             <button onClick={() => navigate(-1)} className="btn-secondary py-2 px-4 text-xs">
               ← Back
             </button>

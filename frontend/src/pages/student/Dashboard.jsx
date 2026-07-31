@@ -126,7 +126,7 @@ export default function StudentDashboard() {
                 { label: 'Enrolled Classes',value: profileData?.enrolled_classes?.length || 0,     color: 'text-brand-600',   bg: 'bg-brand-50 border-brand-100',     icon: 'M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342' },
               ].map(s => (
                 <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-card hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-4">
-                  <div className={`w-11 h-11 ${s.bg} rounded-xl border flex items-center justify-center flex-shrink-0 shadow-2xs`}>
+                  <div className={`w-11 h-11 ${s.bg} rounded-xl border flex items-center justify-center flex-shrink-0 shadow-sm`}>
                     <svg className={`w-5 h-5 ${s.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                       <path strokeLinecap="round" strokeLinejoin="round" d={s.icon} />
                     </svg>
@@ -278,7 +278,7 @@ export default function StudentDashboard() {
               {profileData?.enrolled_classes?.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {profileData.enrolled_classes.map(cls => (
-                    <div key={cls.id} className="bg-white p-3 rounded-xl border border-brand-100 shadow-2xs">
+                    <div key={cls.id} className="bg-white p-3 rounded-xl border border-brand-100 shadow-sm">
                       <p className="font-bold text-slate-900 text-xs">{cls.name}</p>
                       {cls.description && <p className="text-[11px] text-slate-500 mt-0.5">{cls.description}</p>}
                     </div>

@@ -22,6 +22,12 @@ export default function ClassManagement() {
   const [enrollError, setEnrollError] = useState(null);
   const [fileUploading, setFileUploading] = useState(false);
 
+  // Loading states for actions
+  const [deletingClassId, setDeletingClassId] = useState(null);
+  const [removingStudentId, setRemovingStudentId] = useState(null);
+  const [addingCoTeacher, setAddingCoTeacher] = useState(false);
+  const [removingCoTeacherId, setRemovingCoTeacherId] = useState(null);
+
   // Share class modal
   const [shareClassObj, setShareClassObj] = useState(null);
   const [coTeachers, setCoTeachers] = useState([]);
@@ -59,7 +65,7 @@ export default function ClassManagement() {
       await client.post('/classes', { name: newClassName.trim() });
       setNewClassName('');
       setShowCreateModal(false);
-      loadClasses();
+      await loadClasses();
     } catch (err) {
       setCreateError(err.response?.data?.detail || 'Failed to create class.');
     } finally {
@@ -69,11 +75,14 @@ export default function ClassManagement() {
 
   const handleDeleteClass = async (classId, className) => {
     if (!window.confirm(`Are you sure you want to delete class "${className}"? This will remove all student roster associations.`)) return;
+    setDeletingClassId(classId);
     try {
       await client.delete(`/classes/${classId}`);
-      loadClasses();
+      await loadClasses();
     } catch (err) {
       alert(err.response?.data?.detail || "Failed to delete class.");
+    } finally {
+      setDeletingClassId(null);
     }
   };
 
@@ -112,7 +121,7 @@ export default function ClassManagement() {
         setStudentEmailInput('');
         setStudentNameInput('');
         await openStudentModal(selectedClass);
-        loadClasses();
+        await loadClasses();
       } else if (res.data.errors && res.data.errors.length > 0) {
         setEnrollError(res.data.errors.join(', '));
       }
@@ -146,8 +155,8 @@ export default function ClassManagement() {
         setEnrollError(`Errors: ${res.data.errors.join(' | ')}`);
       }
       setEnrollMsg(msg);
-      openStudentModal(selectedClass);
-      loadClasses();
+      await openStudentModal(selectedClass);
+      await loadClasses();
     } catch (err) {
       setEnrollError(err.response?.data?.detail || 'Failed to upload roster file.');
     } finally {
@@ -160,12 +169,15 @@ export default function ClassManagement() {
     if (!selectedClass) return;
     const confirmMsg = studentId < 0 ? "Cancel pending invitation?" : "Remove this student from class?";
     if (!window.confirm(confirmMsg)) return;
+    setRemovingStudentId(studentId);
     try {
       await client.delete(`/classes/${selectedClass.id}/students/${studentId}`);
-      openStudentModal(selectedClass);
-      loadClasses();
+      await openStudentModal(selectedClass);
+      await loadClasses();
     } catch (err) {
       alert(err.response?.data?.detail || "Failed to remove student.");
+    } finally {
+      setRemovingStudentId(null);
     }
   };
 
@@ -188,6 +200,7 @@ export default function ClassManagement() {
     if (!coTeacherEmailInput.trim() || !shareClassObj) return;
     setShareMsg(null);
     setShareError(null);
+    setAddingCoTeacher(true);
     try {
       const res = await client.post(`/classes/${shareClassObj.id}/co-teachers`, {
         email: coTeacherEmailInput.trim()
@@ -198,20 +211,26 @@ export default function ClassManagement() {
       setCoTeachers(updated.data);
     } catch (err) {
       setShareError(err.response?.data?.detail || 'Failed to share class.');
+    } finally {
+      setAddingCoTeacher(false);
     }
   };
 
   const handleRemoveCoTeacher = async (coTeacherId) => {
     if (!shareClassObj) return;
     if (!window.confirm("Remove this co-teacher's access to the class?")) return;
+    setRemovingCoTeacherId(coTeacherId);
     try {
       await client.delete(`/classes/${shareClassObj.id}/co-teachers/${coTeacherId}`);
       const updated = await client.get(`/classes/${shareClassObj.id}/co-teachers`);
       setCoTeachers(updated.data);
     } catch (err) {
       alert(err.response?.data?.detail || "Failed to remove co-teacher.");
+    } finally {
+      setRemovingCoTeacherId(null);
     }
   };
+
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -282,9 +301,15 @@ export default function ClassManagement() {
                   </button>
                   <button
                     onClick={() => handleDeleteClass(c.id, c.name)}
-                    className="py-1.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 text-xs font-bold transition border border-red-200"
+                    disabled={deletingClassId === c.id}
+                    className="py-1.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 text-xs font-bold transition border border-red-200 disabled:opacity-50 inline-flex items-center gap-1"
                   >
-                    🗑 Delete
+                    {deletingClassId === c.id ? (
+                      <>
+                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                        Deleting…
+                      </>
+                    ) : '🗑 Delete'}
                   </button>
                 </div>
               </div>
@@ -363,8 +388,8 @@ export default function ClassManagement() {
                   placeholder="teacher@example.com"
                   className="input text-xs py-2"
                 />
-                <button type="submit" className="btn-primary text-xs py-2 px-3 whitespace-nowrap">
-                  + Add Teacher
+                <button type="submit" disabled={addingCoTeacher} className="btn-primary text-xs py-2 px-3 whitespace-nowrap disabled:opacity-50">
+                  {addingCoTeacher ? 'Adding…' : '+ Add Teacher'}
                 </button>
               </div>
             </form>
@@ -383,9 +408,10 @@ export default function ClassManagement() {
                       </div>
                       <button
                         onClick={() => handleRemoveCoTeacher(ct.teacher_id)}
-                        className="px-2 py-1 bg-red-50 text-red-600 font-bold rounded-md hover:bg-red-100 transition"
+                        disabled={removingCoTeacherId === ct.teacher_id}
+                        className="px-2 py-1 bg-red-50 text-red-600 font-bold rounded-md hover:bg-red-100 transition disabled:opacity-50 inline-flex items-center gap-1"
                       >
-                        Remove
+                        {removingCoTeacherId === ct.teacher_id ? 'Removing…' : 'Remove'}
                       </button>
                     </div>
                   ))}
@@ -497,6 +523,7 @@ export default function ClassManagement() {
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {students.map(std => {
                       const isPending = std.status === "pending_registration";
+                      const targetId = isPending ? std.id : std.student_id;
                       return (
                         <tr key={std.id} className="hover:bg-slate-50/50">
                           <td className="px-4 py-3 font-bold text-slate-900">
@@ -514,7 +541,7 @@ export default function ClassManagement() {
                           <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">{std.student_email}</td>
                           <td className="px-4 py-3">
                             {isPending ? (
-                              <span className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                              <span className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-sm">
                                 ⏳ Pending Registration
                               </span>
                             ) : (
@@ -525,10 +552,11 @@ export default function ClassManagement() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <button
-                              onClick={() => handleRemoveStudent(isPending ? std.id : std.student_id)}
-                              className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 font-bold border border-red-200 transition"
+                              onClick={() => handleRemoveStudent(targetId)}
+                              disabled={removingStudentId === targetId}
+                              className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-650 font-bold border border-red-200 transition disabled:opacity-50 inline-flex items-center gap-1"
                             >
-                              {isPending ? 'Cancel' : 'Remove'}
+                              {removingStudentId === targetId ? 'Removing…' : (isPending ? 'Cancel' : 'Remove')}
                             </button>
                           </td>
                         </tr>

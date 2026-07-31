@@ -127,12 +127,18 @@ export default function ExamList() {
     setAlertPage(1);
   };
 
+  const [publishingId, setPublishingId] = useState(null);
+
   const handlePublish = async (examId) => {
+    setPublishingId(examId);
     try {
       await client.post(`/exams/${examId}/publish`);
-      setExams(exams.map(e => e.id === examId ? { ...e, status: 'published' } : e));
+      const examsRes = await client.get('/exams');
+      setExams(examsRes.data);
     } catch (err) {
-      alert('Failed to publish exam');
+      alert('Failed to publish exam: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -209,9 +215,15 @@ export default function ExamList() {
                                 </button>
                                 <button
                                   onClick={() => handlePublish(exam.id)}
-                                  className="flex-1 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition"
+                                  disabled={publishingId === exam.id}
+                                  className="flex-1 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                                 >
-                                  Publish
+                                  {publishingId === exam.id ? (
+                                    <>
+                                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                                      Publishing…
+                                    </>
+                                  ) : 'Publish'}
                                 </button>
                               </>
                             ) : (
