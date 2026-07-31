@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
+import { useAudioVAD } from '../../hooks/useAudioVAD';
 
 // ─── Face Detection via face-api.js (loaded from CDN in index.html) ──────────
 const FACE_API_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
@@ -44,6 +45,7 @@ export default function ExamRoom() {
   const [violationMsg, setViolationMsg] = useState('');
   const [violationFlash, setViolationFlash] = useState(false);
   const [totalViolations, setTotalViolations] = useState(0);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   // Refs
   const videoRef = useRef(null);
@@ -51,9 +53,11 @@ export default function ExamRoom() {
   const streamRef = useRef(null);
   const faceIntervalRef = useRef(null);
   const identityIntervalRef = useRef(null);
-  const audioIntervalRef = useRef(null);
-  const audioCtxRef = useRef(null);
   const timerRef = useRef(null);
+  const isSubmittingRef = useRef(false); // prevents fullscreen_exit flag on intentional submit
+
+  // VAD: expose the live stream to the hook via state so it re-runs on mount
+  const [vadStream, setVadStream] = useState(null);
 
   // ── Load exam data ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function ExamRoom() {
         video: { width: 320, height: 240 },
         audio: true
       });
+      setPermissionDenied(false);
       streamRef.current = ms;
       if (videoRef.current) videoRef.current.srcObject = ms;
 
@@ -103,36 +108,11 @@ export default function ExamRoom() {
       // Send identity-check snapshot every 30s
       identityIntervalRef.current = setInterval(sendIdentityCheck, 30000);
 
-      // Set up Audio Context for noise tracking during exam
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        audioCtxRef.current = audioCtx;
-        const source = audioCtx.createMediaStreamSource(ms);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512;
-        source.connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-
-        let noiseDuration = 0;
-        audioIntervalRef.current = setInterval(() => {
-          analyser.getByteFrequencyData(data);
-          const avg = data.reduce((a, b) => a + b, 0) / data.length;
-          const level = Math.min(100, Math.round((avg / 128) * 100));
-          // If level is above 35% for 3 consecutive seconds, log a violation
-          if (level > 35) {
-            noiseDuration += 1;
-            if (noiseDuration >= 3) {
-              triggerViolation('high_noise', '⚠ High audio / speaking detected! Please remain quiet.');
-              noiseDuration = 0;
-            }
-          } else {
-            noiseDuration = Math.max(0, noiseDuration - 1);
-          }
-        }, 1000);
-      } catch (ae) {
-        console.warn('Audio Context failed to initialize:', ae);
-      }
+      // ── Expose stream for Silero VAD hook ─────────────────────────────────
+      // setVadStream triggers the useAudioVAD hook to start real-time detection
+      setVadStream(ms);
     } catch {
+      setPermissionDenied(true);
       triggerViolation('camera_denied', 'Camera/Microphone access denied during exam');
     }
   };
@@ -159,13 +139,8 @@ export default function ExamRoom() {
     }
     clearInterval(faceIntervalRef.current);
     clearInterval(identityIntervalRef.current);
-    clearInterval(audioIntervalRef.current);
-    if (audioCtxRef.current) {
-      try {
-        audioCtxRef.current.close().catch(() => {});
-      } catch {}
-    }
     clearTimeout(timerRef.current);
+    setVadStream(null);
   };
 
   // ── Real face detection via face-api.js ─────────────────────────────────────
@@ -254,24 +229,50 @@ export default function ExamRoom() {
         snapshot = canvas.toDataURL('image/jpeg', 0.6);
       }
 
-      const res = await client.post('/proctoring/violation', {
-        attempt_id: parseInt(attemptId),
-        type: type,
-        snapshot: snapshot
-      });
+      if (type !== 'speech_detected') {
+        const res = await client.post('/proctoring/violation', {
+          attempt_id: parseInt(attemptId),
+          type: type,
+          snapshot: snapshot
+        });
 
-      if (res.data?.auto_submitted) {
-        setViolationMsg('⚠ Maximum violations reached — your exam has been auto-submitted.');
-        stopCamera();
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
+        if (res.data?.auto_submitted) {
+          setViolationMsg('⚠ Maximum violations reached — your exam has been auto-submitted.');
+          stopCamera();
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+          setTimeout(() => {
+            window.location.href = `/student/result/${attemptId}`;
+          }, 2000);
         }
-        setTimeout(() => {
-          window.location.href = `/student/result/${attemptId}`;
-        }, 2000);
       }
     } catch { /* silent */ }
   }, [attemptId, navigate]);
+
+  // ── Silero VAD — Real-time speech detection (browser-side ONNX) ─────────────
+  const { vadStatus, vadProb, audioRms, isRecording } = useAudioVAD({
+    stream: vadStream,
+    onSpeechDetected: useCallback(async (audioBlob) => {
+      // 1. Instantly show violation warning to student
+      triggerViolation('speech_detected', '🔇 Speech detected — please remain silent during the exam.');
+
+      // 2. Upload audio evidence clip to server via standard /proctoring/violation call
+      try {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          try {
+            await client.post('/proctoring/violation', {
+              attempt_id: parseInt(attemptId),
+              type: 'speech_detected',
+              audio_data: reader.result,   // base64 data URL of the .webm clip
+            });
+          } catch { /* silent — violation UI already shown */ }
+        };
+        reader.readAsDataURL(audioBlob);
+      } catch { /* silent */ }
+    }, [attemptId, triggerViolation]),
+  });
 
   // ── Tab-switch, Copy-Paste, and Fullscreen Guards ───────────────────────────
   useEffect(() => {
@@ -313,7 +314,8 @@ export default function ExamRoom() {
     };
 
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) {
+      // Ignore fullscreen exit when student intentionally submits the exam
+      if (!document.fullscreenElement && !isSubmittingRef.current) {
         triggerViolation('fullscreen_exit', '⚠ Fullscreen mode exited! Stay in fullscreen to avoid flag.');
       }
     };
@@ -349,6 +351,7 @@ export default function ExamRoom() {
   // ── Submit exam ──────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (submitting) return;
+    isSubmittingRef.current = true;   // must be BEFORE exitFullscreen to avoid false violation
     setSubmitting(true);
     stopCamera();
     if (document.fullscreenElement && document.exitFullscreen) {
@@ -358,11 +361,20 @@ export default function ExamRoom() {
       await client.post(`/attempts/${attemptId}/submit`);
       window.location.href = `/student/result/${attemptId}`;
     } catch {
+      isSubmittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const confirmSubmit = () => {
+    // Enforce all questions answered before manual submit
+    const unanswered = questions.length - answeredCount;
+    if (unanswered > 0) {
+      setViolationMsg(`⚠ Please answer all questions before submitting. ${unanswered} question${unanswered > 1 ? 's' : ''} remaining.`);
+      setViolationFlash(true);
+      setTimeout(() => { setViolationFlash(false); setViolationMsg(''); }, 4000);
+      return;
+    }
     setShowConfirmModal(true);
   };
 
@@ -380,6 +392,36 @@ export default function ExamRoom() {
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-4 border-brand-200 border-t-brand-600 animate-spin" />
+    </div>
+  );
+
+  if (permissionDenied) return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl text-center space-y-5 border border-slate-200">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-slate-900 font-display">Camera &amp; Microphone Required</h2>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            This proctored exam strictly requires active camera and microphone permissions. You cannot start or view the exam until access is granted.
+          </p>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left text-xs text-slate-500 space-y-1">
+          <p className="font-semibold text-slate-700">How to enable access:</p>
+          <p>1. Click the lock 🔒 icon in your browser URL address bar.</p>
+          <p>2. Set <strong>Camera</strong> and <strong>Microphone</strong> to <strong>Allow</strong>.</p>
+          <p>3. Click the button below to retry.</p>
+        </div>
+        <button
+          onClick={startCamera}
+          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shadow-md"
+        >
+          Grant Permissions &amp; Retry
+        </button>
+      </div>
     </div>
   );
 
@@ -428,6 +470,20 @@ export default function ExamRoom() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
               </svg>
               {faceCount === 0 ? 'No face' : faceCount === 1 ? 'Face OK' : `${faceCount} faces!`}
+            </div>
+
+            {/* VAD (Voice) status indicator */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${
+              vadStatus === 'active'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : vadStatus === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'
+            }`}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+              </svg>
+              {vadStatus === 'active' ? 'Mic OK' : vadStatus === 'error' ? 'Mic Err' : 'Mic…'}
             </div>
 
             {/* Timer */}
@@ -638,6 +694,25 @@ export default function ExamRoom() {
                     <span className="text-slate-500 font-medium">Noise &amp; Voice Guard</span>
                     <span className="font-bold text-emerald-600">Active</span>
                   </div>
+                  {vadStatus === 'active' && (
+                    <div className="pt-1.5 border-t border-slate-100 text-[10px] space-y-1">
+                      <div className="flex justify-between text-slate-500 font-medium">
+                        <span>Mic Input Level:</span>
+                        <span className="font-mono font-bold text-slate-700">{(audioRms * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between text-slate-500 font-medium">
+                        <span>AI Voice Confidence:</span>
+                        <span className={`font-mono font-bold ${vadProb >= 0.50 ? 'text-amber-600 animate-pulse' : 'text-slate-700'}`}>
+                          {(vadProb * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      {isRecording && (
+                        <div className="text-red-600 font-bold animate-pulse text-right text-[9px] pt-0.5">
+                          🔴 Capturing spoken speech...
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">

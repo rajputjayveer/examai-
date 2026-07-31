@@ -69,10 +69,33 @@ def get_attempt_report(
         genai.configure(api_key=settings.GEMINI_API_KEY)
         
         try:
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            # Model resolution with fallback to gemini-2.5-flash
+            req_model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
+            try:
+                model = genai.GenerativeModel(req_model)
+            except Exception:
+                model = genai.GenerativeModel("gemini-2.5-flash")
+
             wrong_count = len(questions) - (attempt.score or 0)
             viol_list = [v.type for v in violations]
             
+            # Read recorded audio evidence clips (.webm) as inline bytes (bypasses upload_file SSL gRPC issues)
+            audio_files = []
+            for v in violations:
+                if v.evidence_path and v.evidence_path.endswith('.webm'):
+                    full_audio_path = os.path.join(STORAGE_DIR, v.evidence_path)
+                    if os.path.exists(full_audio_path):
+                        try:
+                            with open(full_audio_path, "rb") as af:
+                                audio_bytes = af.read()
+                            if len(audio_bytes) > 0:
+                                audio_files.append({
+                                    "mime_type": "audio/webm",
+                                    "data": audio_bytes
+                                })
+                        except Exception as read_err:
+                            print(f"[Gemini Audio Read Error] {read_err}")
+
             if is_student:
                 prompt = (
                     f"You are an academic mentor. A student named {student.name if student else 'Student'} "
@@ -86,13 +109,15 @@ def get_attempt_report(
                 prompt = (
                     f"You are an AI proctoring auditor. A candidate named {student.name if student else 'Candidate'} "
                     f"attempted the exam '{exam.title if exam else 'Exam'}'. They logged {len(violations)} "
-                    f"violations (types: {', '.join(viol_list)}). Analyze this sequence of behaviors. "
+                    f"violations (types: {', '.join(viol_list)}). "
+                    f"{'The attached audio clip(s) contain speech evidence detected during the exam. Listen to the audio, summarize what was spoken, and state if they were asking for help or reading answers.' if audio_files else ''} "
                     f"Provide a professional, objective 3-sentence evaluation for the instructor classifying "
-                    f"the cheating risk level (Low, Medium, High) and detailing if these violations "
-                    f"look like tab switches, looking away, or mismatch incidents."
+                    f"the cheating risk level (Low, Medium, High) and detailing violations like detected speech/voice, "
+                    f"tab switches, looking away, or face mismatch incidents."
                 )
                 
-            response = model.generate_content(prompt)
+            contents = audio_files + [prompt] if audio_files else prompt
+            response = model.generate_content(contents)
             ai_insight = response.text.strip()
 
             # Cache the generated insight in database

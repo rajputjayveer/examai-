@@ -27,7 +27,8 @@ app.add_middleware(
 # Mount static storage folder to serve evidence files
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage")
 os.makedirs(STORAGE_DIR, exist_ok=True)
-app.mount("/api/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
+app.mount("/api/storage", StaticFiles(directory=STORAGE_DIR), name="api_storage")
+app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
 
 # Wire routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

@@ -11,7 +11,7 @@ from app.models.attempt import Attempt
 from app.models.violation import Violation
 from app.models.question import Question
 from app.models.answer import Answer
-from app.schemas.proctoring import ViolationCreate, ViolationResponse, IdentityCheckCreate
+from app.schemas.proctoring import ViolationCreate, ViolationResponse, IdentityCheckCreate, AudioViolationCreate
 
 router = APIRouter()
 
@@ -31,21 +31,31 @@ def log_violation(
         
     evidence_path = None
     if violation_in.snapshot:
-        # Decode and save to files
+        # Decode and save picture snapshot (.jpg)
         attempt_dir = os.path.join(STORAGE_DIR, "evidence", str(attempt.id))
         os.makedirs(attempt_dir, exist_ok=True)
-        
         filename = f"{int(datetime.utcnow().timestamp())}_{violation_in.type}.jpg"
         file_path = os.path.join(attempt_dir, filename)
-        
         try:
             header, encoded = violation_in.snapshot.split(",", 1) if "," in violation_in.snapshot else ("", violation_in.snapshot)
-            img_data = base64.b64decode(encoded)
             with open(file_path, "wb") as f:
-                f.write(img_data)
+                f.write(base64.b64decode(encoded))
             evidence_path = f"evidence/{attempt.id}/{filename}"
         except Exception as e:
             print("Failed to decode and save violation snapshot:", e)
+    elif violation_in.audio_data:
+        # Decode and save audio evidence clip (.webm)
+        attempt_dir = os.path.join(STORAGE_DIR, "evidence", str(attempt.id))
+        os.makedirs(attempt_dir, exist_ok=True)
+        filename = f"{int(datetime.utcnow().timestamp())}_{violation_in.type}.webm"
+        file_path = os.path.join(attempt_dir, filename)
+        try:
+            header, encoded = violation_in.audio_data.split(",", 1) if "," in violation_in.audio_data else ("", violation_in.audio_data)
+            with open(file_path, "wb") as f:
+                f.write(base64.b64decode(encoded))
+            evidence_path = f"evidence/{attempt.id}/{filename}"
+        except Exception as e:
+            print("Failed to decode and save audio evidence clip:", e)
             
     violation = Violation(
         attempt_id=violation_in.attempt_id,
@@ -118,3 +128,50 @@ def identity_check(
 
     return {"verified": is_match, "distance": round(distance, 3)}
 
+
+@router.post("/audio-violation")
+def save_audio_violation(
+    check_in: AudioViolationCreate,
+    current_user: User = Depends(RoleChecker(["student"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Browser has already detected speech via Silero VAD ONNX (real-time, ~100ms latency).
+    This endpoint stores the 4-second audio evidence clip and logs the violation.
+    No server-side ML inference needed — detection runs in the browser.
+    """
+    attempt = db.query(Attempt).filter(
+        Attempt.id == check_in.attempt_id,
+        Attempt.student_id == current_user.id
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    evidence_path = None
+    if check_in.audio_data:
+        attempt_dir = os.path.join(STORAGE_DIR, "evidence", str(attempt.id))
+        os.makedirs(attempt_dir, exist_ok=True)
+        filename = f"{int(datetime.utcnow().timestamp())}_speech_detected.webm"
+        file_path = os.path.join(attempt_dir, filename)
+        try:
+            header, encoded = check_in.audio_data.split(",", 1) if "," in check_in.audio_data else ("", check_in.audio_data)
+            with open(file_path, "wb") as f:
+                f.write(base64.b64decode(encoded))
+            evidence_path = f"evidence/{attempt.id}/{filename}"
+        except Exception as e:
+            print(f"[AudioViolation] Failed to save audio clip: {e}")
+
+    violation = Violation(
+        attempt_id=attempt.id,
+        type="speech_detected",
+        evidence_path=evidence_path
+    )
+    db.add(violation)
+    db.commit()
+    db.refresh(violation)
+
+    return {
+        "logged": True,
+        "id": violation.id,
+        "evidence_path": evidence_path
+    }

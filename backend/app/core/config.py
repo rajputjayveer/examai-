@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     DEV_MODE: bool = False
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str
     FRONTEND_BASE_URL: str = "http://localhost:3000"

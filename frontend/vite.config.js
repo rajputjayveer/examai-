@@ -12,5 +12,9 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  // Don't pre-bundle onnxruntime-web — it loads WASM dynamically
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+  },
 })

@@ -84,7 +84,19 @@ def submit_answer(
         )
         db.add(db_answer)
         
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        # Handle concurrent requests race condition
+        db_answer = db.query(Answer).filter(
+            Answer.attempt_id == attempt_id,
+            Answer.question_id == answer_in.question_id
+        ).first()
+        if db_answer:
+            db_answer.selected_option = answer_in.selected_option
+            db.commit()
+
     db.refresh(db_answer)
     return db_answer
 
