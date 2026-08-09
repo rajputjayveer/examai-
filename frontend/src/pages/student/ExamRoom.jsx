@@ -299,14 +299,30 @@ export default function ExamRoom() {
 
     requestFs();
 
+    // Track visibility changes (tab switch / window minimize)
+    // Guard: do NOT flag when student is submitting (isSubmittingRef.current = true)
     const onVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden && !isSubmittingRef.current) {
         triggerViolation('tab_switch', '⚠ Tab switched — stay on the exam page');
       }
     };
 
+    // Track window blur — debounced 300ms to avoid false positives from:
+    //  • clicking the confirm modal submit button
+    //  • browser briefly losing focus during fullscreen mode change
+    let blurTimer = null;
     const onBlur = () => {
-      triggerViolation('window_blur', '⚠ Window lost focus — keep exam in foreground');
+      if (isSubmittingRef.current) return; // skip — intentional submit
+      blurTimer = setTimeout(() => {
+        // Double-check: if we're now submitting (race condition), skip
+        if (!isSubmittingRef.current) {
+          triggerViolation('window_blur', '⚠ Window lost focus — keep exam in foreground');
+        }
+      }, 300);
+    };
+    const onFocus = () => {
+      // Cancel pending blur violation if window regains focus quickly
+      if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
     };
 
     const onCopy = (e) => {
@@ -327,23 +343,26 @@ export default function ExamRoom() {
       }
     };
 
+    // Fullscreen exit guard — also skipped during intentional submission
     const onFullscreenChange = () => {
-      // Ignore fullscreen exit when student intentionally submits the exam
       if (!document.fullscreenElement && !isSubmittingRef.current) {
         triggerViolation('fullscreen_exit', '⚠ Fullscreen mode exited! Stay in fullscreen to avoid flag.');
       }
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('blur', onBlur);
+    window.addEventListener('blur',  onBlur);
+    window.addEventListener('focus', onFocus);
     document.addEventListener('copy', onCopy);
     document.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('fullscreenchange', onFullscreenChange);
 
     return () => {
+      if (blurTimer) clearTimeout(blurTimer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('blur',  onBlur);
+      window.removeEventListener('focus', onFocus);
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('keydown', onKeyDown);

@@ -5,10 +5,10 @@ from datetime import datetime
 class UserBase(BaseModel):
     name: str
     email: EmailStr
-    role: str
+    role: Optional[str] = "student"
 
 class UserCreate(UserBase):
-    password: str
+    password: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr

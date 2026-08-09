@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as ort from 'onnxruntime-web';
 
-const SAMPLE_RATE      = 16000;
-const SPEECH_THRESHOLD = 0.50;   // 50% or above confidence threshold for human speech
-const WINDOW_SIZE      = 512;    // 32 ms per window @ 16 kHz
-const SILENCE_TIMEOUT  = 1500;   // Wait 1.5s of silence after speech before closing clip
-const MAX_RECORD_SECS  = 30000;  // Max 30s single clip safety cap
+const SAMPLE_RATE       = 16000;
+const SPEECH_THRESHOLD  = 0.75;   // 75% confidence — coughs/sneezes alone won't cross this
+const WINDOW_SIZE       = 512;    // 32 ms per window @ 16 kHz
+const SILENCE_TIMEOUT   = 2000;   // Wait 2s of silence after speech before closing clip
+const MAX_RECORD_SECS   = 30000;  // Max 30s single clip safety cap
+const MIN_RMS           = 0.015;  // Minimum mic volume — filters out ambient noise & faint sounds
+const SUSTAINED_FRAMES  = 8;     // Must see 8 consecutive speech frames (~256 ms) before flagging
 
 /**
  * useAudioVAD — real-time Silero VAD v5 with Dynamic Continuous Speech Recording
@@ -16,6 +18,9 @@ export function useAudioVAD({ stream, onSpeechDetected }) {
   const [vadProb, setVadProb]     = useState(0);
   const [audioRms, setAudioRms]   = useState(0);
   const [isRecording, setIsRecording] = useState(false);
+
+  // Sustained-speech counter — prevents single cough/sneeze from triggering a violation
+  const sustainedFramesRef = useRef(0);
 
   const sessionRef          = useRef(null);
   const lastUpdateRef       = useRef(0);
@@ -182,8 +187,16 @@ export function useAudioVAD({ stream, onSpeechDetected }) {
           }
 
           // Dynamic continuous speech trigger
-          if (speechProb >= SPEECH_THRESHOLD && rms > 0.003) {
-            extendRecording();
+          // Require sustained loud speech across multiple frames to avoid false positives
+          // (coughs, sneezes, or brief throat-clearing should NOT trigger violations)
+          if (speechProb >= SPEECH_THRESHOLD && rms > MIN_RMS) {
+            sustainedFramesRef.current += 1;
+            if (sustainedFramesRef.current >= SUSTAINED_FRAMES) {
+              extendRecording();
+            }
+          } else {
+            // Reset counter on any non-speech frame — must be CONTINUOUS speech to trigger
+            sustainedFramesRef.current = 0;
           }
         } catch (err) {
           // Ignore individual frame execution hiccups

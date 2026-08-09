@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
 from app.core.deps import get_current_active_user, RoleChecker
@@ -169,7 +169,9 @@ async def get_exam(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(Exam).where(Exam.id == exam_id))
+    result = await db.execute(
+        select(Exam).options(selectinload(Exam.questions)).where(Exam.id == exam_id)
+    )
     exam = result.scalar_one_or_none()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
