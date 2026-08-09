@@ -53,6 +53,7 @@ export default function ExamRoom() {
   const streamRef = useRef(null);
   const faceIntervalRef = useRef(null);
   const identityIntervalRef = useRef(null);
+  const firstCheckTimerRef = useRef(null); // tracks staggered first-fire timeout
   const timerRef = useRef(null);
   const isSubmittingRef = useRef(false); // prevents fullscreen_exit flag on intentional submit
 
@@ -105,8 +106,16 @@ export default function ExamRoom() {
         faceIntervalRef.current = setInterval(detectFaces, 3000); // every 3s
       }
 
-      // Send identity-check snapshot every 30s
-      identityIntervalRef.current = setInterval(sendIdentityCheck, 30000);
+      // ── Staggered identity-check to spread 35 students across time ──────────
+      // Without staggering: all 35 students fire at second 0, 30, 60... → burst spike.
+      // With staggering: each student waits a random 0-15s before their first check,
+      // then runs every 30s → server gets ~1-2 face checks/sec instead of 35 at once.
+      const FACE_CHECK_INTERVAL_MS = 30000;
+      const randomOffsetMs = Math.random() * 15000; // 0 to 15 seconds random delay
+      firstCheckTimerRef.current = setTimeout(() => {
+        sendIdentityCheck(); // fire first check after random offset
+        identityIntervalRef.current = setInterval(sendIdentityCheck, FACE_CHECK_INTERVAL_MS);
+      }, randomOffsetMs);
 
       // ── Expose stream for Silero VAD hook ─────────────────────────────────
       // setVadStream triggers the useAudioVAD hook to start real-time detection
@@ -139,6 +148,7 @@ export default function ExamRoom() {
     }
     clearInterval(faceIntervalRef.current);
     clearInterval(identityIntervalRef.current);
+    clearTimeout(firstCheckTimerRef.current); // cancel stagger timeout if camera stops early
     clearTimeout(timerRef.current);
     setVadStream(null);
   };
@@ -197,9 +207,12 @@ export default function ExamRoom() {
     if (!video || !canvas) return;
 
     try {
+      // Keep 320x240 resolution — DeepFace needs ~80px+ face width for reliable embedding.
+      // At 160x120 a face is only ~40px wide which causes false identity_mismatch violations.
+      // Bandwidth saving: lower JPEG quality 0.7 → 0.35 (same resolution, ~60% smaller payload).
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, 320, 240);
-      const snapshot = canvas.toDataURL('image/jpeg', 0.7);
+      const snapshot = canvas.toDataURL('image/jpeg', 0.35);
 
       const res = await client.post('/proctoring/identity-check', {
         attempt_id: parseInt(attemptId),
@@ -212,6 +225,7 @@ export default function ExamRoom() {
       console.warn('Identity check failed to reach server', e);
     }
   };
+
 
   // ── Log violation to backend ─────────────────────────────────────────────────
   const triggerViolation = useCallback(async (type, msg) => {
@@ -350,7 +364,9 @@ export default function ExamRoom() {
 
   // ── Submit exam ──────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (submitting) return;
+    // Fix #6: Check ref FIRST (synchronous) — prevents double-submit even during
+    // React re-render gaps where the 'submitting' state hasn't propagated yet.
+    if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;   // must be BEFORE exitFullscreen to avoid false violation
     setSubmitting(true);
     stopCamera();

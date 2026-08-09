@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from sqlalchemy.orm import Session
 import os
 import base64
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.base import get_db
 from app.core.deps import get_current_active_user, RoleChecker
@@ -18,16 +20,21 @@ from app.services.email_service import send_email
 
 router = APIRouter()
 
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage")
+STORAGE_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "storage"
+)
+
 
 class FaceEnrollRequest(BaseModel):
-    image: str # Base64 image snapshot
+    image: str  # Base64 image snapshot
+
 
 @router.post("/enroll-face")
-def enroll_face(
+async def enroll_face(
     payload: FaceEnrollRequest,
     current_user: User = Depends(RoleChecker(["student"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     if not payload.image:
         raise HTTPException(status_code=400, detail="Image data is required")
@@ -38,40 +45,47 @@ def enroll_face(
 
     try:
         header, encoded = payload.image.split(",", 1) if "," in payload.image else ("", payload.image)
-        img_data = base64.b64decode(encoded)
         with open(file_path, "wb") as f:
-            f.write(img_data)
+            f.write(base64.b64decode(encoded))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
 
-    current_user.face_descriptor = f"faces/{current_user.id}/reference.jpg" # store image path
+    current_user.face_descriptor = f"faces/{current_user.id}/reference.jpg"
     current_user.face_enrolled = True
-    db.commit()
+    await db.commit()
 
-    # ── Automatic Post-Biometric Enrollment ─────────────────────────────
-    # Convert matching PendingEnrollment entries into active Enrollment rows
-    pending_list = db.query(PendingEnrollment).filter(
-        PendingEnrollment.email == current_user.email.lower()
-    ).all()
+    # Auto-enroll from pending invitations
+    pending_result = await db.execute(
+        select(PendingEnrollment).where(
+            PendingEnrollment.email == current_user.email.lower()
+        )
+    )
+    pending_list = pending_result.scalars().all()
 
     for p in pending_list:
-        class_room = db.query(ClassRoom).filter(ClassRoom.id == p.class_id).first()
-        existing_enr = db.query(Enrollment).filter(
-            Enrollment.class_id == p.class_id,
-            Enrollment.student_id == current_user.id
-        ).first()
+        cr_result = await db.execute(
+            select(ClassRoom).where(ClassRoom.id == p.class_id)
+        )
+        class_room = cr_result.scalar_one_or_none()
+
+        existing_enr_result = await db.execute(
+            select(Enrollment).where(
+                Enrollment.class_id == p.class_id,
+                Enrollment.student_id == current_user.id
+            )
+        )
+        existing_enr = existing_enr_result.scalar_one_or_none()
 
         if existing_enr:
             existing_enr.status = "active"
         else:
-            new_enr = Enrollment(
+            db.add(Enrollment(
                 class_id=p.class_id,
                 student_id=current_user.id,
                 status="active"
-            )
-            db.add(new_enr)
+            ))
 
-        db.delete(p)
+        await db.delete(p)
 
         if class_room:
             send_email(
@@ -80,25 +94,30 @@ def enroll_face(
                 f"Hello {current_user.name},\n\nYour biometric face profile has been verified! You are now automatically enrolled in {class_room.name}."
             )
 
-    db.commit()
+    await db.commit()
     return {"detail": "Face reference enrolled successfully and class invitations activated"}
 
 
 @router.get("/profile")
-def get_profile(
+async def get_profile(
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     enrolled_classes = []
     if current_user.role == "student":
-        enrs = db.query(Enrollment).filter(Enrollment.student_id == current_user.id, Enrollment.status == "active").all()
-        for e in enrs:
-            cr = db.query(ClassRoom).filter(ClassRoom.id == e.class_id).first()
+        enr_result = await db.execute(
+            select(Enrollment).where(
+                Enrollment.student_id == current_user.id,
+                Enrollment.status == "active"
+            )
+        )
+        for e in enr_result.scalars().all():
+            cr_result = await db.execute(
+                select(ClassRoom).where(ClassRoom.id == e.class_id)
+            )
+            cr = cr_result.scalar_one_or_none()
             if cr:
-                enrolled_classes.append({
-                    "id": cr.id,
-                    "name": cr.name
-                })
+                enrolled_classes.append({"id": cr.id, "name": cr.name})
 
     return {
         "id": current_user.id,
@@ -111,25 +130,43 @@ def get_profile(
 
 
 @router.get("/{student_id}/profile")
-def get_student_profile_for_teacher(
+async def get_student_profile_for_teacher(
     student_id: int,
     current_user: User = Depends(RoleChecker(["teacher", "admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Return detailed performance profile for a student (exams taken, scores, violations)."""
-    student = db.query(User).filter(User.id == student_id, User.role == "student").first()
+    student_result = await db.execute(
+        select(User).where(User.id == student_id, User.role == "student")
+    )
+    student = student_result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Student user not found.")
 
-    attempts = db.query(Attempt).filter(Attempt.student_id == student_id).order_by(Attempt.started_at.desc()).all()
-    
+    att_result = await db.execute(
+        select(Attempt)
+        .where(Attempt.student_id == student_id)
+        .order_by(Attempt.started_at.desc())
+    )
+    attempts = att_result.scalars().all()
+
     attempts_data = []
     total_violations = 0
 
     for att in attempts:
-        exam = db.query(Exam).filter(Exam.id == att.exam_id).first()
-        q_count = db.query(Question).filter(Question.exam_id == att.exam_id).count() if exam else 0
-        v_count = db.query(Violation).filter(Violation.attempt_id == att.id).count()
+        exam_result = await db.execute(select(Exam).where(Exam.id == att.exam_id))
+        exam = exam_result.scalar_one_or_none()
+
+        from sqlalchemy import func
+        q_count_result = await db.execute(
+            select(func.count(Question.id)).where(Question.exam_id == att.exam_id)
+        )
+        q_count = q_count_result.scalar() if exam else 0
+
+        v_count_result = await db.execute(
+            select(func.count(Violation.id)).where(Violation.attempt_id == att.id)
+        )
+        v_count = v_count_result.scalar()
         total_violations += v_count
 
         attempts_data.append({
@@ -144,14 +181,16 @@ def get_student_profile_for_teacher(
             "violations_count": v_count
         })
 
-    enrolled_classes = db.query(Enrollment).filter(
-        Enrollment.student_id == student_id,
-        Enrollment.status == "active"
-    ).all()
-
+    enr_result = await db.execute(
+        select(Enrollment).where(
+            Enrollment.student_id == student_id,
+            Enrollment.status == "active"
+        )
+    )
     class_names = []
-    for enr in enrolled_classes:
-        cr = db.query(ClassRoom).filter(ClassRoom.id == enr.class_id).first()
+    for enr in enr_result.scalars().all():
+        cr_result = await db.execute(select(ClassRoom).where(ClassRoom.id == enr.class_id))
+        cr = cr_result.scalar_one_or_none()
         if cr:
             class_names.append(cr.name)
 

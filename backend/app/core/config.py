@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "examguard"
     DATABASE_URL: str = "mysql+pymysql://root:@localhost:3306/examguard"
     JWT_SECRET: str
-    JWT_EXPIRE_MINUTES: int = 60
+    JWT_EXPIRE_MINUTES: int = 480  # 8 hours — covers a full exam day without token expiry
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = "your_email@gmail.com"

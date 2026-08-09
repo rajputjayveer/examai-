@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import List
 
 from app.db.base import get_db
@@ -11,12 +12,14 @@ from app.models.violation import Violation
 
 router = APIRouter()
 
+
 @router.get("/users")
-def list_users(
+async def list_users(
     current_user: User = Depends(RoleChecker(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    users = db.query(User).all()
+    result = await db.execute(select(User))
+    users = result.scalars().all()
     return [
         {
             "id": u.id,
@@ -29,34 +32,47 @@ def list_users(
         } for u in users
     ]
 
+
 @router.delete("/users/{user_id}")
-def delete_user(
+async def delete_user(
     user_id: int,
     current_user: User = Depends(RoleChecker(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     if user_id == 0:
         raise HTTPException(status_code=400, detail="Cannot delete virtual administrator account")
-        
-    user = db.query(User).filter(User.id == user_id).first()
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    db.delete(user)
-    db.commit()
+
+    await db.delete(user)
+    await db.commit()
     return {"detail": "User deleted successfully"}
 
+
 @router.get("/attempts")
-def list_all_attempts(
+async def list_all_attempts(
     current_user: User = Depends(RoleChecker(["admin"])),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    attempts = db.query(Attempt).all()
+    att_result = await db.execute(select(Attempt))
+    attempts = att_result.scalars().all()
+
     results = []
     for att in attempts:
-        student = db.query(User).filter(User.id == att.student_id).first()
-        exam = db.query(Exam).filter(Exam.id == att.exam_id).first()
-        v_count = db.query(Violation).filter(Violation.attempt_id == att.id).count()
+        student_result = await db.execute(select(User).where(User.id == att.student_id))
+        student = student_result.scalar_one_or_none()
+
+        exam_result = await db.execute(select(Exam).where(Exam.id == att.exam_id))
+        exam = exam_result.scalar_one_or_none()
+
+        v_count_result = await db.execute(
+            select(func.count(Violation.id)).where(Violation.attempt_id == att.id)
+        )
+        v_count = v_count_result.scalar()
+
         results.append({
             "attempt_id": att.id,
             "student_name": student.name if student else "Unknown",

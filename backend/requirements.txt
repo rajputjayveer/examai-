@@ -1,6 +1,8 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
+asyncio
+aiomysql
 pydantic
 pydantic-settings
 python-multipart
@@ -16,3 +18,4 @@ fastapi-mail
 google-generativeai
 pandas
 openpyxl
+slowapi>=0.1.9

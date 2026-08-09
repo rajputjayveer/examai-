@@ -1,4 +1,7 @@
-from app.db.base import Base, engine
+import sqlalchemy
+from sqlalchemy import text
+from app.db.base import Base, engine, ASYNC_DATABASE_URL
+import asyncio
 
 # Import all models so SQLAlchemy registers them before creating tables
 from app.models.user import User
@@ -13,32 +16,40 @@ from app.models.question import Question
 from app.models.attempt import Attempt
 from app.models.answer import Answer
 from app.models.violation import Violation
-from app.db.cleanup import cleanup_past_student_data
 
-
-import sqlalchemy
-from app.core.config import settings
 
 def init_db():
-    """Create all MySQL tables on startup. Automatically creates database if missing."""
-    # Parse database name out of connection string to verify/create it on server root
-    base_url, db_name = settings.DATABASE_URL.rsplit('/', 1)
-    if '?' in db_name:
-        db_name = db_name.split('?')[0]
-    
-    # Connect without database context first
-    temp_engine = sqlalchemy.create_engine(base_url)
-    with temp_engine.connect() as conn:
-        conn.execute(sqlalchemy.text(f"CREATE DATABASE IF NOT EXISTS `{db_name}`"))
-        conn.commit()
-    Base.metadata.create_all(bind=engine)
+    """
+    Create all MySQL tables on startup using a sync engine (for one-time setup).
+    We use a temporary sync pymysql connection only for schema setup because
+    SQLAlchemy's create_all / DDL does not support async natively.
+    The app then switches to the async engine for all runtime queries.
+    """
+    # Build sync URL from the async URL for schema bootstrap only
+    sync_url = ASYNC_DATABASE_URL.replace("mysql+aiomysql://", "mysql+pymysql://", 1)
 
-    # Student data cleanup was completed for reset. Disabled on reloads so registered students persist.
-    # cleanup_past_student_data()
+    # ── Step 1: Create the database if it does not exist ─────────────────────
+    base_url, db_name = sync_url.rsplit("/", 1)
+    if "?" in db_name:
+        db_name = db_name.split("?")[0]
 
-    # Automatically alter existing MySQL tables to add new columns if missing
     try:
-        with engine.connect() as conn:
+        temp_engine = sqlalchemy.create_engine(base_url)
+        with temp_engine.connect() as conn:
+            conn.execute(sqlalchemy.text(f"CREATE DATABASE IF NOT EXISTS `{db_name}`"))
+            conn.commit()
+        temp_engine.dispose()
+    except Exception as e:
+        print(f"[init_db] Could not ensure database exists: {e}")
+
+    # ── Step 2: Create all tables ─────────────────────────────────────────────
+    sync_engine = sqlalchemy.create_engine(sync_url)
+    Base.metadata.create_all(bind=sync_engine)
+
+    # ── Step 3: Auto-migrate missing columns ─────────────────────────────────
+    try:
+        with sync_engine.connect() as conn:
+            # exams table: class_id, visibility
             result = conn.execute(sqlalchemy.text("SHOW COLUMNS FROM `exams`"))
             columns = [row[0] for row in result.fetchall()]
 
@@ -61,7 +72,7 @@ def init_db():
                 except Exception as e:
                     print("Note adding visibility:", e)
 
-            # Check pending_enrollments table for student_name column
+            # pending_enrollments: student_name
             try:
                 res_p = conn.execute(sqlalchemy.text("SHOW COLUMNS FROM `pending_enrollments`"))
                 p_cols = [row[0] for row in res_p.fetchall()]
@@ -72,9 +83,10 @@ def init_db():
                     conn.commit()
             except Exception as e:
                 print("Note adding student_name to pending_enrollments:", e)
+
     except Exception as err:
         print("Schema migration note:", err)
+    finally:
+        sync_engine.dispose()
 
-
-
-
+    print("[init_db] Database schema ready [OK]")
