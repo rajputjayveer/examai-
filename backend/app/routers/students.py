@@ -1,5 +1,6 @@
 import os
 import base64
+import shutil
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -204,4 +205,213 @@ async def get_student_profile_for_teacher(
         "total_exams_attempted": len(attempts_data),
         "total_violations": total_violations,
         "attempts": attempts_data
+    }
+
+
+# ── Biometric Reset Endpoints ──────────────────────────────────────────────────
+
+@router.post("/{student_id}/reset-face")
+async def teacher_reset_student_face(
+    student_id: int,
+    current_user: User = Depends(RoleChecker(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Teacher / Admin: Reset a student's biometric face profile.
+    Clears face_enrolled flag and deletes the reference photo from disk.
+    The student will be prompted to re-enroll before their next exam.
+    """
+    result = await db.execute(
+        select(User).where(User.id == student_id, User.role == "student")
+    )
+    student = result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    # Delete reference photo from disk
+    face_dir = os.path.join(STORAGE_DIR, "faces", str(student_id))
+    if os.path.exists(face_dir):
+        shutil.rmtree(face_dir, ignore_errors=True)
+
+    # Clear biometric fields in database
+    student.face_enrolled = False
+    student.face_descriptor = None
+    await db.commit()
+
+    # Notify student via email
+    try:
+        send_email(
+            student.email,
+            "Your Biometric Profile Has Been Reset",
+            f"Hello {student.name},\n\nYour Face ID biometric profile has been reset by your instructor.\n\nPlease log in to ExamGuard AI and re-enroll your face before attempting any upcoming exams.\n\nIf you have any questions, contact your instructor.\n\nRegards,\nExamGuard AI"
+        )
+    except Exception:
+        pass  # Email failure should not block the reset
+
+    return {
+        "detail": f"Biometric profile for {student.name} has been reset successfully. Student must re-enroll before their next exam.",
+        "student_id": student_id,
+        "student_name": student.name,
+        "face_enrolled": False
+    }
+
+
+@router.post("/me/reset-face")
+async def student_self_reset_face(
+    current_user: User = Depends(RoleChecker(["student"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Student self-service: Reset own biometric face profile for re-enrollment.
+    Useful when the student has changed appearance or had poor enrollment photo quality.
+    """
+    # Delete reference photo from disk
+    face_dir = os.path.join(STORAGE_DIR, "faces", str(current_user.id))
+    if os.path.exists(face_dir):
+        shutil.rmtree(face_dir, ignore_errors=True)
+
+    # Clear biometric fields in database
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one_or_none()
+    if user:
+        user.face_enrolled = False
+        user.face_descriptor = None
+        await db.commit()
+
+    return {
+        "detail": "Your face biometric profile has been reset. Please re-enroll your face to continue.",
+        "face_enrolled": False
+    }
+
+
+# ── Biometric Re-enrollment Request Workflow ───────────────────────────────────
+
+class FaceResetRequestBody(BaseModel):
+    reason: str = ""
+
+@router.post("/me/request-face-update")
+async def student_request_face_update(
+    body: FaceResetRequestBody,
+    current_user: User = Depends(RoleChecker(["student"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Student requests biometric re-enrollment from their profile page.
+    Teacher will see this request in StudentProfileModal and can approve it.
+    """
+    from app.models.face_reset_request import FaceResetRequest
+
+    # Check if request already pending
+    existing = await db.execute(
+        select(FaceResetRequest).where(FaceResetRequest.student_id == current_user.id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="You already have a pending re-enrollment request. Please wait for your teacher to review it.")
+
+    req = FaceResetRequest(
+        student_id=current_user.id,
+        reason=body.reason or "No reason provided",
+        status="pending"
+    )
+    db.add(req)
+    await db.commit()
+    return {"detail": "Re-enrollment request submitted. Your teacher will review and approve it shortly."}
+
+
+@router.get("/{student_id}/face-reset-status")
+async def get_student_face_reset_status(
+    student_id: int,
+    current_user: User = Depends(RoleChecker(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Teacher checks if a student has a pending biometric re-enrollment request.
+    Called by StudentProfileModal on load.
+    """
+    from app.models.face_reset_request import FaceResetRequest
+
+    result = await db.execute(
+        select(FaceResetRequest).where(FaceResetRequest.student_id == student_id)
+    )
+    req = result.scalar_one_or_none()
+    if not req:
+        return {"has_request": False, "status": None, "reason": None}
+
+    return {
+        "has_request": True,
+        "status": req.status,
+        "reason": req.reason,
+        "requested_at": req.requested_at
+    }
+
+
+@router.post("/{student_id}/approve-face-update")
+async def teacher_approve_face_update(
+    student_id: int,
+    current_user: User = Depends(RoleChecker(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Teacher approves the student's biometric re-enrollment request.
+    - Deletes old reference face photo from disk
+    - Clears face_enrolled and face_descriptor in DB
+    - Sends email to student with instructions to re-enroll
+    - Deletes the request from the database
+    """
+    from app.models.face_reset_request import FaceResetRequest
+    from datetime import datetime
+
+    # Verify student exists
+    student_result = await db.execute(
+        select(User).where(User.id == student_id, User.role == "student")
+    )
+    student = student_result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    # Check pending request exists
+    req_result = await db.execute(
+        select(FaceResetRequest).where(FaceResetRequest.student_id == student_id)
+    )
+    req = req_result.scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=404, detail="No pending re-enrollment request found for this student.")
+
+    # Delete old reference photo from disk
+    face_dir = os.path.join(STORAGE_DIR, "faces", str(student_id))
+    if os.path.exists(face_dir):
+        shutil.rmtree(face_dir, ignore_errors=True)
+
+    # Clear biometric fields
+    student.face_enrolled = False
+    student.face_descriptor = None
+
+    # Remove the request record
+    await db.delete(req)
+    await db.commit()
+
+    # Send approval email to student
+    try:
+        send_email(
+            student.email,
+            "✅ Face Re-enrollment Approved — Action Required",
+            f"Hello {student.name},\n\n"
+            f"Your request to update your biometric Face ID has been approved by your instructor.\n\n"
+            f"Your previous face reference has been cleared. Please follow these steps to complete your re-enrollment:\n\n"
+            f"  1. Log in to ExamGuard AI\n"
+            f"  2. Go to your Biometrics Profile tab\n"
+            f"  3. Click 'Re-enroll Biometrics Now'\n"
+            f"  4. Follow the camera capture steps\n\n"
+            f"Important: You will not be able to take any exams until your face re-enrollment is complete.\n\n"
+            f"Approved by: {current_user.name}\n\n"
+            f"Regards,\nExamGuard AI"
+        )
+    except Exception:
+        pass  # Email failure should not block approval
+
+    return {
+        "detail": f"Re-enrollment approved for {student.name}. Old biometrics cleared and email sent with instructions.",
+        "student_id": student_id,
+        "student_name": student.name,
+        "face_enrolled": False
     }

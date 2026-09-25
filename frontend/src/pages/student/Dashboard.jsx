@@ -73,6 +73,9 @@ export default function StudentDashboard() {
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('exams');
+  const [faceRequestState, setFaceRequestState] = useState('idle'); // idle | pending | submitting | submitted
+  const [faceRequestReason, setFaceRequestReason] = useState('');
+  const [faceRequestMsg, setFaceRequestMsg] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -82,9 +85,24 @@ export default function StudentDashboard() {
       .catch(() => setLoading(false));
 
     client.get('/students/profile')
-      .then(res => setProfileData(res.data))
+      .then(res => {
+        setProfileData(res.data);
+      })
       .catch(() => {});
   }, []);
+
+  const handleFaceUpdateRequest = async () => {
+    if (!faceRequestReason.trim()) return;
+    setFaceRequestState('submitting');
+    try {
+      await client.post('/students/me/request-face-update', { reason: faceRequestReason });
+      setFaceRequestState('submitted');
+      setFaceRequestMsg('Request sent! Your teacher will review and approve it. You will receive an email once approved.');
+    } catch (err) {
+      setFaceRequestMsg(err.response?.data?.detail || 'Failed to submit request.');
+      setFaceRequestState('idle');
+    }
+  };
 
   const liveExams     = exams.filter(e => { const now = new Date(); return now >= new Date(e.start_at) && now <= new Date(e.end_at) && !e.user_has_submitted; });
   const upcomingExams = exams.filter(e => new Date() < new Date(e.start_at) && !e.user_has_submitted);
@@ -298,13 +316,57 @@ export default function StudentDashboard() {
               </p>
               {!user?.face_enrolled && (
                 <Link to="/enroll-face" className="inline-block px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-sm transition">
-                  Enroll Biometrics Now →
+                  Re-enroll Biometrics Now →
                 </Link>
               )}
             </div>
+
+            {/* Request Face Update Section — only shown when face IS enrolled */}
+            {user?.face_enrolled && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+                <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wide flex items-center gap-2">
+                  🔄 Request Face ID Update
+                </h4>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  If your face looks different (new glasses, changed appearance, poor enrollment photo), you can request your teacher to approve a face update. You will receive an email once approved.
+                </p>
+
+                {faceRequestState === 'submitted' ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-amber-100 border border-amber-300 rounded-xl">
+                    <span className="text-lg">⏳</span>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800">Pending Teacher Approval</p>
+                      <p className="text-[11px] text-amber-700">{faceRequestMsg}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={faceRequestReason}
+                      onChange={e => setFaceRequestReason(e.target.value)}
+                      placeholder="Brief reason (e.g. 'Changed appearance, previous photo was dark')"
+                      rows={2}
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-amber-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                    />
+                    {faceRequestMsg && (
+                      <p className="text-xs text-red-600 font-semibold">{faceRequestMsg}</p>
+                    )}
+                    <button
+                      onClick={handleFaceUpdateRequest}
+                      disabled={faceRequestState === 'submitting' || !faceRequestReason.trim()}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-60 flex items-center gap-1.5"
+                    >
+                      {faceRequestState === 'submitting'
+                        ? <><span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> Submitting...</>
+                        : '📤 Submit Request to Teacher'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
     </div>
   );
-}
+}

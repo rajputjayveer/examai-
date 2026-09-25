@@ -10,6 +10,7 @@ from app.models.question import Question
 from app.models.attempt import Attempt
 from app.models.answer import Answer
 from app.models.violation import Violation
+from app.models.face_reset_request import FaceResetRequest
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "Attempt",
     "Answer",
     "Violation",
+    "FaceResetRequest",
 ]

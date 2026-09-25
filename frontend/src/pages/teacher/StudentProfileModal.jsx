@@ -5,14 +5,25 @@ export default function StudentProfileModal({ studentId, onClose }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState({ type: '', text: '' });
+  const [resetRequest, setResetRequest] = useState(null); // pending re-enrollment request from student
+  const [approveLoading, setApproveLoading] = useState(false);
 
   useEffect(() => {
     if (!studentId) return;
     setLoading(true);
     setError('');
-    client.get(`/students/${studentId}/profile`)
-      .then(res => {
-        setProfile(res.data);
+    setResetRequest(null);
+    // Load profile and check for pending re-enrollment request in parallel
+    Promise.all([
+      client.get(`/students/${studentId}/profile`),
+      client.get(`/students/${studentId}/face-reset-status`)
+    ])
+      .then(([profileRes, resetRes]) => {
+        setProfile(profileRes.data);
+        if (resetRes.data.has_request) setResetRequest(resetRes.data);
         setLoading(false);
       })
       .catch(err => {
@@ -20,6 +31,35 @@ export default function StudentProfileModal({ studentId, onClose }) {
         setLoading(false);
       });
   }, [studentId]);
+
+  const handleApproveReenrollment = async () => {
+    setApproveLoading(true);
+    try {
+      await client.post(`/students/${studentId}/approve-face-update`);
+      setProfile(prev => ({ ...prev, face_enrolled: false }));
+      setResetRequest(null);
+      setResetMsg({ type: 'success', text: `✅ Approved! ${profile?.name}'s old biometrics cleared. Approval email sent — they must re-enroll before their next exam.` });
+    } catch (err) {
+      setResetMsg({ type: 'error', text: err.response?.data?.detail || 'Approval failed.' });
+    } finally {
+      setApproveLoading(false);
+    }
+  };
+
+  const handleResetFace = async () => {
+    setResetLoading(true);
+    setResetMsg({ type: '', text: '' });
+    try {
+      await client.post(`/students/${studentId}/reset-face`);
+      setProfile(prev => ({ ...prev, face_enrolled: false }));
+      setResetMsg({ type: 'success', text: `Face biometrics cleared. ${profile?.name} must re-enroll before their next exam.` });
+      setResetConfirm(false);
+    } catch (err) {
+      setResetMsg({ type: 'error', text: err.response?.data?.detail || 'Failed to reset biometrics.' });
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   if (!studentId) return null;
 
@@ -44,20 +84,88 @@ export default function StudentProfileModal({ studentId, onClose }) {
             {error}
           </div>
         ) : (
-          <div className="space-y-6 overflow-auto pr-1">
+          <div className="space-y-4 overflow-auto pr-1">
+
+            {/* Pending Re-enrollment Request Banner — full width above main card */}
+            {resetRequest && (
+              <div className="p-4 rounded-2xl border-2 border-amber-300 bg-amber-50">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-amber-900 mb-1">🔔 Face Re-enrollment Request</p>
+                    <p className="text-xs text-amber-700">Reason: <span className="font-semibold">{resetRequest.reason}</span></p>
+                    {resetRequest.requested_at && (
+                      <p className="text-[10px] text-amber-600 mt-0.5">Submitted: {new Date(resetRequest.requested_at).toLocaleString()}</p>
+                    )}
+                    <p className="text-[11px] text-amber-600 mt-1 italic">Approving will clear old face data and email the student to re-enroll.</p>
+                  </div>
+                  <button
+                    onClick={handleApproveReenrollment}
+                    disabled={approveLoading}
+                    className="shrink-0 px-4 py-2 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition disabled:opacity-60 flex items-center gap-1.5 shadow-sm"
+                  >
+                    {approveLoading
+                      ? <><span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> Approving...</>
+                      : '✅ Approve Re-enrollment'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Main Details */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
               <div>
                 <h4 className="text-lg font-bold text-slate-900 font-display">{profile.name}</h4>
                 <p className="text-xs text-slate-500">{profile.email}</p>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                     profile.face_enrolled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200 animate-pulse'
                   }`}>
                     <span className={`w-2 h-2 rounded-full ${profile.face_enrolled ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     {profile.face_enrolled ? '✓ Face ID Enrolled' : '⚠ Face ID Missing'}
                   </span>
+                  {profile.face_enrolled && !resetConfirm && (
+                    <button
+                      onClick={() => setResetConfirm(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition"
+                    >
+                      🔄 Reset Face ID
+                    </button>
+                  )}
                 </div>
+
+                {/* Inline Reset Confirmation */}
+                {resetConfirm && (
+                  <div className="mt-3 p-3 rounded-xl border border-red-200 bg-red-50 text-xs">
+                    <p className="font-bold text-red-800 mb-2">⚠ Reset Biometric Profile?</p>
+                    <p className="text-red-700 mb-3">This will delete <strong>{profile.name}'s</strong> Face ID reference photo. They will be unable to take exams until they re-enroll. They will be notified by email.</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleResetFace}
+                        disabled={resetLoading}
+                        className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition disabled:opacity-60 flex items-center gap-1"
+                      >
+                        {resetLoading ? (
+                          <><span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> Resetting...</>
+                        ) : 'Yes, Reset Face ID'}
+                      </button>
+                      <button
+                        onClick={() => setResetConfirm(false)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition"
+                      >Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Success / Error message */}
+                {resetMsg.text && (
+                  <div className={`mt-2 p-2.5 rounded-xl text-xs font-semibold border ${
+                    resetMsg.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    {resetMsg.type === 'success' ? '✅ ' : '❌ '}{resetMsg.text}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 text-center">
