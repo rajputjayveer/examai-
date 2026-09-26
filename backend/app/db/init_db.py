@@ -16,6 +16,8 @@ from app.models.question import Question
 from app.models.attempt import Attempt
 from app.models.answer import Answer
 from app.models.violation import Violation
+from app.models.face_reset_request import FaceResetRequest
+from app.models.attendance import AttendanceSession, AttendanceRecord
 
 
 def init_db():

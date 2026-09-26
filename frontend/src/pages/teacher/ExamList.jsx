@@ -5,20 +5,20 @@ import { useAuth } from '../../context/AuthContext';
 import ClassManagement from './ClassManagement';
 import StudentProfileModal from './StudentProfileModal';
 
+const TEACHER_TABS = [
+  { id: 'exams', label: 'Exams Workspace', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
+  { id: 'classes', label: 'My Classes', icon: 'M4.26 10.147a60.436 60.436 0 01-.491-6.347A48.627 48.627 0 0112 3c4.248 0 8.312.545 12.163 1.571a60.465 60.465 0 01-.491 6.347m-15.482 0a50.57 50.57 0 00-2.658 8.14A59.905 59.905 0 0112 19c4.248 0 8.312-.545 12.163-1.571a50.55 50.55 0 00-2.658-8.14' },
+  { id: 'students', label: 'Student Directory', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.978 11.978 0 0112 20.25a11.978 11.978 0 01-3-.109v-.111c0-1.113.285-2.16.786-3.07M12 20.25a8.974 8.974 0 002.223-5.843M12 20.25a8.974 8.974 0 01-2.223-5.843m0 0a8.968 8.968 0 00-1.75-5.54M9 14.377a8.968 8.968 0 01-1.75-5.54M12 14.407a8.977 8.977 0 01-2.223-5.843M12 14.407a8.977 8.977 0 002.223-5.843M12 8.564a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z' },
+  { id: 'alerts', label: 'Live Warnings Feed', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
+];
+
 function Sidebar({ activeTab, setActiveTab }) {
   const { logout, user } = useAuth();
-  
-  const tabs = [
-    { id: 'exams', label: 'Exams Workspace', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
-    { id: 'classes', label: 'My Classes', icon: 'M4.26 10.147a60.436 60.436 0 01-.491-6.347A48.627 48.627 0 0112 3c4.248 0 8.312.545 12.163 1.571a60.465 60.465 0 01-.491 6.347m-15.482 0a50.57 50.57 0 00-2.658 8.14A59.905 59.905 0 0112 19c4.248 0 8.312-.545 12.163-1.571a50.55 50.55 0 00-2.658-8.14' },
-    { id: 'students', label: 'Student Directory', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.978 11.978 0 0112 20.25a11.978 11.978 0 01-3-.109v-.111c0-1.113.285-2.16.786-3.07M12 20.25a8.974 8.974 0 002.223-5.843M12 20.25a8.974 8.974 0 01-2.223-5.843m0 0a8.968 8.968 0 00-1.75-5.54M9 14.377a8.968 8.968 0 01-1.75-5.54M12 14.407a8.977 8.977 0 01-2.223-5.843M12 14.407a8.977 8.977 0 002.223-5.843M12 8.564a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z' },
-    { id: 'alerts', label: 'Live Warnings Feed', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
-  ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 min-h-screen px-4 py-6 gap-2 shadow-sm">
+    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 min-h-screen px-4 py-6 gap-2 shadow-sm flex-shrink-0">
       <div className="flex items-center gap-2.5 mb-8 px-2">
-        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shadow-xs">
           <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
           </svg>
@@ -28,7 +28,7 @@ function Sidebar({ activeTab, setActiveTab }) {
 
       <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Teacher Console</p>
 
-      {tabs.map(t => (
+      {TEACHER_TABS.map(t => (
         <button
           key={t.id}
           onClick={() => setActiveTab(t.id)}
@@ -69,12 +69,13 @@ export default function ExamList() {
   const [loading, setLoading] = useState(true);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('exams');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [alertPage, setAlertPage] = useState(1);
   const [alertMeta, setAlertMeta] = useState({ total: 0, pages: 0 });
   const [inspectStudentId, setInspectStudentId] = useState(null);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -145,18 +146,106 @@ export default function ExamList() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 p-6 lg:p-8 overflow-auto">
+
+      {/* Mobile Slide-Over Drawer for Teacher */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex animate-fade-in">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={() => setMobileMenuOpen(false)} />
+          <div className="relative w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col p-5 z-10">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shadow-xs">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                </div>
+                <span className="font-extrabold text-slate-900 font-display text-sm">SecureExam AI</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+
+            <div className="py-4 space-y-1">
+              <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Teacher Console</p>
+              {TEACHER_TABS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setActiveTab(t.id); setMobileMenuOpen(false); }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold w-full transition ${
+                    activeTab === t.id
+                      ? 'bg-brand-50 text-brand-700 border border-brand-100 shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
+                  </svg>
+                  {t.label}
+                </button>
+              ))}
+
+              <button
+                onClick={() => { navigate('/teacher/create-exam'); setMobileMenuOpen(false); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold w-full bg-brand-600 text-white shadow-xs mt-3"
+              >
+                <span>+</span> Create New Exam
+              </button>
+            </div>
+
+            <div className="mt-auto border-t border-slate-100 pt-4">
+              <div className="px-3 py-2 mb-2 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700 truncate">{user?.name}</p>
+                <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email}</p>
+              </div>
+              <button onClick={logout}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 w-full transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto pb-24 md:pb-8">
+        {/* Mobile Header Bar */}
+        <div className="md:hidden flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-3.5 mb-5 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+              aria-label="Open menu"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <span className="font-bold text-slate-900 font-display text-sm">
+              {TEACHER_TABS.find(t => t.id === activeTab)?.label || 'Console'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => navigate('/teacher/create-exam')}
+            className="px-3 py-1.5 rounded-xl bg-brand-600 text-white text-xs font-bold shadow-xs"
+          >
+            + Create
+          </button>
+        </div>
         
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between border-b border-slate-200 pb-5">
+        {/* Desktop Header */}
+        <div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 font-display">Teacher Dashboard</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display">Teacher Dashboard</h1>
             <p className="text-xs text-slate-500">Welcome, {user?.name || 'Instructor'}</p>
           </div>
           {activeTab === 'exams' && (
             <button
               onClick={() => navigate('/teacher/create-exam')}
-              className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shadow-xs"
             >
               + Create Exam
             </button>
@@ -410,6 +499,27 @@ export default function ExamList() {
           </div>
         )}
       </main>
+
+      {/* Mobile Fixed Bottom Navigation Bar for Teacher */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-2 flex items-center justify-around shadow-lg">
+        {TEACHER_TABS.map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition ${
+                isActive ? 'text-brand-600 font-bold' : 'text-slate-500 font-medium'
+              }`}
+            >
+              <svg className={`w-5 h-5 ${isActive ? 'text-brand-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
+              </svg>
+              <span className="text-[10px] leading-none">{t.label.split(' ')[0]}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {inspectStudentId && (
         <StudentProfileModal

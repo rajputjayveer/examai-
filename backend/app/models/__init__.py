@@ -11,6 +11,7 @@ from app.models.attempt import Attempt
 from app.models.answer import Answer
 from app.models.violation import Violation
 from app.models.face_reset_request import FaceResetRequest
+from app.models.attendance import AttendanceSession, AttendanceRecord
 
 __all__ = [
     "User",
@@ -26,4 +27,6 @@ __all__ = [
     "Answer",
     "Violation",
     "FaceResetRequest",
+    "AttendanceSession",
+    "AttendanceRecord",
 ]

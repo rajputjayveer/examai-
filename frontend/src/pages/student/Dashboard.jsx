@@ -3,19 +3,19 @@ import { useNavigate, Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
+const TABS = [
+  { id: 'exams', label: 'Exams Workspace', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
+  { id: 'history', label: 'Performance Reports', icon: 'M9 19.5A4.5 4.5 0 007.5 15h-3a4.5 4.5 0 00-3 3.5M9 15h3M9 18h3m10.5-3.5h-3a4.5 4.5 0 00-3 3.5m6-3.5h3A4.5 4.5 0 0121 18.75m-6-3.75a3 3 0 11-6 0 3 3 0 016 0z' },
+  { id: 'biometrics', label: 'Biometrics Profile', icon: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z' },
+];
+
 function Sidebar({ activeTab, setActiveTab }) {
   const { logout, user } = useAuth();
-  
-  const tabs = [
-    { id: 'exams', label: 'Exams Workspace', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
-    { id: 'history', label: 'Performance Reports', icon: 'M9 19.5A4.5 4.5 0 007.5 15h-3a4.5 4.5 0 00-3 3.5M9 15h3M9 18h3m10.5-3.5h-3a4.5 4.5 0 00-3 3.5m6-3.5h3A4.5 4.5 0 0121 18.75m-6-3.75a3 3 0 11-6 0 3 3 0 016 0z' },
-    { id: 'biometrics', label: 'Biometrics Profile', icon: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z' },
-  ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 min-h-screen px-4 py-6 gap-2 shadow-sm">
+    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 min-h-screen px-4 py-6 gap-2 shadow-sm flex-shrink-0">
       <div className="flex items-center gap-2.5 mb-8 px-2">
-        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shadow-xs">
           <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
           </svg>
@@ -25,7 +25,7 @@ function Sidebar({ activeTab, setActiveTab }) {
 
       <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Student Workspace</p>
 
-      {tabs.map(t => (
+      {TABS.map(t => (
         <button
           key={t.id}
           onClick={() => setActiveTab(t.id)}
@@ -73,10 +73,11 @@ export default function StudentDashboard() {
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('exams');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [faceRequestState, setFaceRequestState] = useState('idle'); // idle | pending | submitting | submitted
   const [faceRequestReason, setFaceRequestReason] = useState('');
   const [faceRequestMsg, setFaceRequestMsg] = useState('');
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -111,17 +112,113 @@ export default function StudentDashboard() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 p-6 lg:p-8 overflow-auto">
+
+      {/* Mobile Slide-Over Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex animate-fade-in">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={() => setMobileMenuOpen(false)} />
+          <div className="relative w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col p-5 z-10">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center shadow-xs">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                </div>
+                <span className="font-extrabold text-slate-900 font-display text-sm">SecureExam AI</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+
+            <div className="py-4 space-y-1">
+              <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Student Navigation</p>
+              {TABS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setActiveTab(t.id); setMobileMenuOpen(false); }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold w-full transition ${
+                    activeTab === t.id
+                      ? 'bg-brand-50 text-brand-700 border border-brand-100 shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
+                  </svg>
+                  {t.label}
+                </button>
+              ))}
+
+              <button
+                onClick={() => { navigate('/student/attendance'); setMobileMenuOpen(false); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold w-full bg-indigo-50 text-indigo-700 border border-indigo-100 mt-2"
+              >
+                <span>📷</span> Mark Attendance
+              </button>
+            </div>
+
+            <div className="mt-auto border-t border-slate-100 pt-4">
+              <div className="px-3 py-2 mb-2 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700 truncate">{user?.name}</p>
+                <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email}</p>
+              </div>
+              <button onClick={logout}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 w-full transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto pb-24 md:pb-8">
+        {/* Mobile Header Bar */}
+        <div className="md:hidden flex items-center justify-between bg-white border border-slate-200 rounded-2xl p-3.5 mb-5 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+              aria-label="Open menu"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <span className="font-bold text-slate-900 font-display text-sm">
+              {TABS.find(t => t.id === activeTab)?.label || 'Dashboard'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/student/attendance')}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-xs"
+            >
+              <span>📷</span> Scan
+            </button>
+          </div>
+        </div>
         
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between border-b border-slate-200 pb-5">
+        {/* Desktop Header */}
+        <div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 font-display">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display">
               Welcome back, <span className="text-brand-600">{user?.name?.split(' ')[0]}</span> 👋
             </h1>
-            <p className="text-slate-500 text-sm mt-1">SecureExam Portal Student Workspace</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">SecureExam Portal Student Workspace</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+            <button
+              onClick={() => navigate('/student/attendance')}
+              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-xs transition"
+            >
+              <span>📷</span> Mark Attendance
+            </button>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
               user?.face_enrolled ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200 animate-pulse'
             }`}>
@@ -367,6 +464,35 @@ export default function StudentDashboard() {
           </div>
         )}
       </main>
+
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-2 flex items-center justify-around shadow-lg">
+        {TABS.map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition ${
+                isActive ? 'text-brand-600 font-bold' : 'text-slate-500 font-medium'
+              }`}
+            >
+              <svg className={`w-5 h-5 ${isActive ? 'text-brand-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
+              </svg>
+              <span className="text-[10px] leading-none">{t.label.split(' ')[0]}</span>
+            </button>
+          );
+        })}
+
+        <button
+          onClick={() => navigate('/student/attendance')}
+          className="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-indigo-600 font-bold transition"
+        >
+          <div className="w-5 h-5 flex items-center justify-center text-sm leading-none">📷</div>
+          <span className="text-[10px] leading-none text-indigo-600">Attendance</span>
+        </button>
+      </nav>
     </div>
   );
 }

@@ -38,6 +38,14 @@ export default function ClassManagement() {
   // Student Profile Inspection Modal
   const [inspectStudentId, setInspectStudentId] = useState(null);
 
+  // Smart Attendance Launcher Modal
+  const [attendanceModalClass, setAttendanceModalClass] = useState(null);
+  const [attendanceTitle, setAttendanceTitle] = useState('');
+  const [attendanceSubject, setAttendanceSubject] = useState('');
+  const [attendanceRadius, setAttendanceRadius] = useState(50);
+  const [launchingAttendance, setLaunchingAttendance] = useState(false);
+  const [attendanceError, setAttendanceError] = useState(null);
+
   const navigate = useNavigate();
 
   const loadClasses = async () => {
@@ -231,6 +239,53 @@ export default function ClassManagement() {
     }
   };
 
+  const openAttendanceModal = (cls) => {
+    setAttendanceModalClass(cls);
+    setAttendanceTitle(`Lecture - ${new Date().toLocaleDateString()}`);
+    setAttendanceSubject('');
+    setAttendanceRadius(50);
+    setAttendanceError(null);
+  };
+
+  const handleLaunchAttendanceSession = () => {
+    if (!attendanceModalClass || !attendanceTitle.trim()) return;
+    setAttendanceError(null);
+    setLaunchingAttendance(true);
+
+    if (!navigator.geolocation) {
+      setAttendanceError("Geolocation is not supported by your browser. Location is required for classroom geofencing.");
+      setLaunchingAttendance(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await client.post('/attendance/sessions/create', {
+            class_id: attendanceModalClass.id,
+            title: attendanceTitle.trim(),
+            subject_name: attendanceSubject.trim() || null,
+            classroom_lat: pos.coords.latitude,
+            classroom_lon: pos.coords.longitude,
+            radius_meters: parseFloat(attendanceRadius) || 50.0,
+            mode: 'standard'
+          });
+          setAttendanceModalClass(null);
+          navigate(`/teacher/attendance/session/${res.data.id}`);
+        } catch (err) {
+          setAttendanceError(err.response?.data?.detail || "Failed to create attendance session.");
+        } finally {
+          setLaunchingAttendance(false);
+        }
+      },
+      (err) => {
+        setAttendanceError("Could not retrieve GPS coordinates. Please allow location permissions in your browser.");
+        setLaunchingAttendance(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -277,7 +332,20 @@ export default function ClassManagement() {
               </div>
 
               <div className="space-y-2 pt-5 mt-4 border-t border-slate-100">
+                <button
+                  onClick={() => openAttendanceModal(c)}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <span>📡</span> Launch Smart Attendance
+                </button>
+
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => navigate(`/teacher/class/${c.id}/attendance-history`)}
+                    className="flex-1 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition border border-purple-200"
+                  >
+                    📋 History
+                  </button>
                   <button
                     onClick={() => openStudentModal(c)}
                     className="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition border border-slate-200"
@@ -565,6 +633,108 @@ export default function ClassManagement() {
                   </tbody>
                 </table>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Attendance Launcher Modal */}
+      {attendanceModalClass && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📡</span>
+                <h3 className="font-bold text-slate-900 font-display text-base">
+                  Launch Smart Attendance
+                </h3>
+              </div>
+              <button
+                onClick={() => setAttendanceModalClass(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4">
+              Starting attendance for <strong className="text-slate-800">{attendanceModalClass.name}</strong>. The projector view will lock your GPS location and generate a rolling QR code.
+            </p>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Session / Lecture Title</label>
+                <input
+                  type="text"
+                  value={attendanceTitle}
+                  onChange={(e) => setAttendanceTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-slate-800"
+                  placeholder="e.g. Lecture 12 - Distributed Systems"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Subject Name <span className="text-slate-400 font-normal">(optional)</span></label>
+                <input
+                  type="text"
+                  value={attendanceSubject}
+                  onChange={(e) => setAttendanceSubject(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-slate-800"
+                  placeholder="e.g. DBMS, Computer Networks, OS"
+                />
+              </div>
+              {/* Always-on verification info badge */}
+              <div className="p-3 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-800">
+                <p className="font-bold mb-1">🛡️ Auto-verification (always active)</p>
+                <p className="text-brand-600 font-normal leading-relaxed">
+                  QR Token (5s rolling) → GPS Geofence → Device Lock → <strong>Face ID Check</strong>
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Classroom GPS Radius (Meters)</label>
+                <select
+                  value={attendanceRadius}
+                  onChange={(e) => setAttendanceRadius(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-slate-800"
+                >
+                  <option value={30}>30 meters (Strict Classroom)</option>
+                  <option value={50}>50 meters (Standard Lecture Hall)</option>
+                  <option value={100}>100 meters (Auditorium / Large Campus Hall)</option>
+                </select>
+              </div>
+
+
+              {attendanceError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                  {attendanceError}
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAttendanceModalClass(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLaunchAttendanceSession}
+                  disabled={launchingAttendance || !attendanceTitle.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {launchingAttendance ? (
+                    <>
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      <span>Locking GPS…</span>
+                    </>
+                  ) : (
+                    <span>🚀 Open Projector View</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

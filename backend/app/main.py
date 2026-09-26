@@ -10,7 +10,7 @@ import os
 import traceback
 
 from app.db.init_db import init_db
-from app.routers import auth, students, exams, attempts, proctoring, reports, admin, classes
+from app.routers import auth, students, exams, attempts, proctoring, reports, admin, classes, attendance
 
 # ── One-time schema bootstrap (sync, runs before ASGI event loop starts) ──────
 init_db()
@@ -66,6 +66,7 @@ app.include_router(exams.router,      prefix="/api/exams",      tags=["Exams"])
 app.include_router(attempts.router,   prefix="/api/attempts",   tags=["Attempts"])
 app.include_router(proctoring.router, prefix="/api/proctoring", tags=["Proctoring"])
 app.include_router(reports.router,    prefix="/api/reports",    tags=["Reports"])
+app.include_router(attendance.router, prefix="/api/attendance", tags=["Attendance"])
 
 
 @app.get("/")
