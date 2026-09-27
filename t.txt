@@ -1,0 +1,22 @@
+Option 2: If using IP Address http://10.139.190.3:3000 on Chrome
+If you want to use the IP address directly on your PC or phone browser:
+
+Open a new tab in Chrome and go to:
+text
+chrome://flags/#unsafely-treat-insecure-origin-as-secure
+Set the dropdown to Enabled.
+In the text box below it, paste:
+text
+http://10.139.190.3:3000,http://10.139.190.3:8000
+Click the blue Relaunch button at the bottom of Chrome.
+
+
+
+
+
+
+
+
+
+
+also in any camara give option to chnage front rear 

@@ -5,71 +5,144 @@ export default function CameraCheck() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const audioCtxRef = useRef(null);
   const [faceOk, setFaceOk] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [error, setError] = useState('');
 
+  const stopAllMedia = () => {
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        console.warn('Error stopping tracks:', e);
+      }
+      streamRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      try {
+        audioCtxRef.current.close();
+      } catch (e) {}
+      audioCtxRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
   useEffect(() => {
-    let stream;
-    let audioCtx;
     let rafId;
     let faceapiReady = false;
 
     const setup = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, 
+            audio: true 
+          });
+        } catch (e1) {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } 
+          });
+        }
 
-        // ── Mic level meter ────────────────────────────────────────────────
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512;
-        source.connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
+        streamRef.current = stream;
 
-        const meterLoop = () => {
-          analyser.getByteFrequencyData(data);
-          const avg = data.reduce((a, b) => a + b, 0) / data.length;
-          setMicLevel(Math.min(100, Math.round((avg / 128) * 100)));
-          rafId = requestAnimationFrame(meterLoop);
-        };
-        meterLoop();
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.setAttribute('playsinline', '');
+          videoRef.current.muted = true;
+          await videoRef.current.play().catch(() => {});
+        }
+
+        // ── Mic level meter (if audio track exists) ─────────────────────────
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            audioCtxRef.current = audioCtx;
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 512;
+            source.connect(analyser);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+
+            const meterLoop = () => {
+              analyser.getByteFrequencyData(data);
+              const avg = data.reduce((a, b) => a + b, 0) / data.length;
+              setMicLevel(Math.min(100, Math.round((avg / 128) * 100)));
+              rafId = requestAnimationFrame(meterLoop);
+            };
+            meterLoop();
+          } catch (audioErr) {
+            console.warn('Audio meter init error:', audioErr);
+          }
+        }
 
         // ── Face detection via face-api.js ─────────────────────────────────
-        if (!window.faceapi) {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          document.body.appendChild(script);
-          await new Promise(resolve => { script.onload = resolve; });
+        try {
+          if (!window.faceapi) {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+            document.body.appendChild(script);
+            await new Promise(resolve => { script.onload = resolve; script.onerror = resolve; });
+          }
+          if (window.faceapi?.nets?.tinyFaceDetector) {
+            await window.faceapi.nets.tinyFaceDetector.loadFromUri(
+              'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'
+            );
+            faceapiReady = true;
+          }
+        } catch (mErr) {
+          console.warn('Face-api load warning:', mErr);
         }
-        await window.faceapi.nets.tinyFaceDetector.loadFromUri(
-          'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'
-        );
-        faceapiReady = true;
 
         const detectLoop = async () => {
-          if (faceapiReady && videoRef.current && videoRef.current.readyState === 4) {
-            const detection = await window.faceapi.detectSingleFace(
-              videoRef.current, new window.faceapi.TinyFaceDetectorOptions()
-            );
-            setFaceOk(!!detection);
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            if (faceapiReady && window.faceapi) {
+              try {
+                const detection = await window.faceapi.detectSingleFace(
+                  videoRef.current, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 })
+                );
+                setFaceOk(!!detection);
+              } catch {
+                setFaceOk(true);
+              }
+            } else {
+              setFaceOk(videoRef.current.videoWidth > 0);
+            }
           }
-          setTimeout(detectLoop, 800);
+          setTimeout(detectLoop, 600);
         };
         detectLoop();
-      } catch {
-        setError('Could not access camera/microphone. Please allow permissions and reload.');
+      } catch (err) {
+        console.error('Camera/Mic setup error:', err);
+        const errDetail = err.name === 'NotReadableError' || err.name === 'TrackStartError'
+          ? 'Your camera is currently in use by another application or browser tab. Please close any other app using the camera and reload.'
+          : 'Could not access camera/microphone. Please allow permissions in browser settings and reload.';
+        setError(errDetail);
       }
     };
 
     setup();
     return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      if (audioCtx) audioCtx.close();
+      stopAllMedia();
       if (rafId) cancelAnimationFrame(rafId);
     };
   }, []);
+
+  const handleContinue = () => {
+    stopAllMedia();
+    navigate(`/student/instructions/${examId}`);
+  };
+
+  const handleBackToDashboard = () => {
+    stopAllMedia();
+    navigate('/');
+  };
 
   const canContinue = faceOk;
 
@@ -77,9 +150,17 @@ export default function CameraCheck() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-8 max-w-lg w-full">
         {/* Header */}
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-slate-900 font-display">Test your camera &amp; mic</h1>
-          <p className="text-sm text-slate-500 mt-1">Fix any lighting or camera issues now — before your timer starts.</p>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 font-display">Test your camera &amp; mic</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Fix lighting or permissions before starting.</p>
+          </div>
+          <button
+            onClick={handleBackToDashboard}
+            className="text-xs font-bold text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition"
+          >
+            ✕ Exit to Dashboard
+          </button>
         </div>
 
         {error ? (
@@ -110,7 +191,7 @@ export default function CameraCheck() {
               autoPlay
               playsInline
               muted
-              className="w-full rounded-xl bg-slate-900 mb-4"
+              className="w-full rounded-xl bg-slate-900 mb-4 aspect-video object-cover"
               style={{ transform: 'scaleX(-1)' }}
             />
 
@@ -140,7 +221,7 @@ export default function CameraCheck() {
 
         <button
           disabled={!canContinue}
-          onClick={() => navigate(`/student/instructions/${examId}`)}
+          onClick={handleContinue}
           className={`w-full py-2.5 rounded-xl font-semibold text-sm transition ${
             canContinue
               ? 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm'

@@ -154,10 +154,10 @@ export default function ClassManagement() {
       const res = await client.post(`/classes/${selectedClass.id}/students/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       const addedCount = res.data.added ? res.data.added.length : 0;
       const errorCount = res.data.errors ? res.data.errors.length : 0;
-      
+
       let msg = `Roster Upload Complete: ${addedCount} entry/entries processed.`;
       if (errorCount > 0) {
         setEnrollError(`Errors: ${res.data.errors.join(' | ')}`);
@@ -374,7 +374,7 @@ export default function ClassManagement() {
                   >
                     {deletingClassId === c.id ? (
                       <>
-                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
                         Deleting…
                       </>
                     ) : '🗑 Delete'}

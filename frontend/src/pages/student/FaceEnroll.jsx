@@ -19,6 +19,8 @@ export default function FaceEnroll() {
   const { refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  const streamRef = useRef(null);
+
   // Load faceapi recognition models on mount
   useEffect(() => {
     async function loadModels() {
@@ -51,7 +53,10 @@ export default function FaceEnroll() {
     }
     loadModels();
     return () => {
-      stream?.getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
     };
   }, []);
 
@@ -66,6 +71,7 @@ export default function FaceEnroll() {
         ms = await navigator.mediaDevices.getUserMedia({ video: true });
       }
       if (videoRef.current) videoRef.current.srcObject = ms;
+      streamRef.current = ms;
       setStream(ms);
       setQualityHint('Detecting face...');
     } catch {
